@@ -136,28 +136,6 @@ logs:
     source: python
 ```
 
-## Como publicar uma release
-
-O projeto possui um workflow em `.github/workflows/release.yml`.
-
-Sempre que houver push na branch `main`, o GitHub Actions cria uma release com uma tag automática no formato:
-
-```txt
-vYYYY.MM.DD-NUMERO_DO_RUN
-```
-
-A release inclui apenas o conteúdo de `app/shared`:
-
-- `flowbridge.js` como arquivo individual;
-- `flowbridge-VERSAO.zip`;
-- `flowbridge-VERSAO.tar.gz`.
-
-Também é possível criar uma release manualmente pela aba `Actions`, usando `workflow_dispatch` e informando uma versão, por exemplo:
-
-```txt
-v1.0.0
-```
-
 ## Como declarar um diagrama
 
 Crie um arquivo `.mmd` no site do time:
