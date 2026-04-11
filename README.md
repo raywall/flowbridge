@@ -83,6 +83,59 @@ make vendas
 make estoque
 ```
 
+## Monitoramento com Datadog
+
+O `src/server.py` já envia métricas para o Datadog Agent usando DogStatsD, sem precisar instalar uma biblioteca Python extra. Cada processo recebe um `service` próprio:
+
+- `localhost:4200`: `flowbridge-shared`;
+- `localhost:4210`: `flowbridge-vendas`;
+- `localhost:4220`: `flowbridge-estoque`.
+
+Com o Datadog Agent local rodando e o DogStatsD habilitado em `localhost:8125`, basta iniciar normalmente. O `Makefile` já define `DD_ENV=local`, `DD_AGENT_HOST=127.0.0.1`, `DD_DOGSTATSD_PORT=8125`, `DD_METRICS_ENABLED=1`, `DD_LOGS_JSON=0` e `DD_VERSION=dev`:
+
+```bash
+make start
+```
+
+As métricas enviadas são:
+
+```txt
+flowbridge.server.up
+flowbridge.http.requests
+flowbridge.http.request.duration
+```
+
+Todas recebem tags como `service`, `env`, `port`, `directory`, `method`, `status_code` e `status_family`, o que permite filtrar separadamente `4200`, `4210` e `4220` no Datadog.
+
+Se o Agent estiver em outro host ou porta:
+
+```bash
+make start DD_AGENT_HOST=127.0.0.1 DD_DOGSTATSD_PORT=8125 DD_ENV=local
+```
+
+Para logs estruturados em JSON, ative:
+
+```bash
+make start DD_LOGS_JSON=1 DD_ENV=local
+```
+
+Em execução local, o Datadog Agent não coleta automaticamente o stdout de um processo fora de container. Uma opção simples é redirecionar a saída para um arquivo:
+
+```bash
+mkdir -p logs
+make start DD_LOGS_JSON=1 DD_ENV=local > logs/flowbridge.log 2>&1
+```
+
+Depois configure o Agent para coletar esse arquivo, por exemplo em `conf.d/flowbridge.d/conf.yaml`:
+
+```yaml
+logs:
+  - type: file
+    path: /caminho/absoluto/para/flowbridge/logs/flowbridge.log
+    service: flowbridge
+    source: python
+```
+
 ## Como publicar uma release
 
 O projeto possui um workflow em `.github/workflows/release.yml`.

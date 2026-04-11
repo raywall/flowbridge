@@ -1,17 +1,25 @@
 SOURCEDIR=./src
 BASEDIR=./app
+DD_ENV ?= local
+DD_AGENT_HOST ?= 127.0.0.1
+DD_DOGSTATSD_PORT ?= 8125
+DD_LOGS_JSON ?= 0
+DD_METRICS_ENABLED ?= 1
+DD_VERSION ?= dev
+
+DATADOG_ENV=DD_ENV=${DD_ENV} DD_AGENT_HOST=${DD_AGENT_HOST} DD_DOGSTATSD_PORT=${DD_DOGSTATSD_PORT} DD_LOGS_JSON=${DD_LOGS_JSON} DD_METRICS_ENABLED=${DD_METRICS_ENABLED} DD_VERSION=${DD_VERSION}
 
 # Inicia o site para disponibilidade do plugin
 shared:
-	@python3 ${SOURCEDIR}/server.py 4200 ${BASEDIR}/shared
+	@${DATADOG_ENV} DD_SERVICE=flowbridge-shared python3 ${SOURCEDIR}/server.py 4200 ${BASEDIR}/shared
 
 # Inicia o site de Vendas com CORS habilitado
 vendas:
-	@python3 ${SOURCEDIR}/server.py 4210 ${BASEDIR}/vendas
+	@${DATADOG_ENV} DD_SERVICE=flowbridge-vendas python3 ${SOURCEDIR}/server.py 4210 ${BASEDIR}/vendas
 
 # Inicia o site de Estoque com CORS habilitado
 estoque:
-	@python3 ${SOURCEDIR}/server.py 4220 ${BASEDIR}/estoque
+	@${DATADOG_ENV} DD_SERVICE=flowbridge-estoque python3 ${SOURCEDIR}/server.py 4220 ${BASEDIR}/estoque
 
 # Inicia os dois sites em paralelo (dois processos em background)
 start:
@@ -20,9 +28,9 @@ start:
 	@echo "  Iniciando Vendas.            em http://localhost:4210"
 	@echo "  Iniciando Estoque.           em http://localhost:4220"
 	@echo ""
-	@python3 ${SOURCEDIR}/server.py 4200 ${BASEDIR}/shared & \
-	 python3 ${SOURCEDIR}/server.py 4210 ${BASEDIR}/vendas & \
-	 python3 ${SOURCEDIR}/server.py 4220 ${BASEDIR}/estoque & \
+	@${DATADOG_ENV} DD_SERVICE=flowbridge-shared python3 ${SOURCEDIR}/server.py 4200 ${BASEDIR}/shared & \
+	 ${DATADOG_ENV} DD_SERVICE=flowbridge-vendas python3 ${SOURCEDIR}/server.py 4210 ${BASEDIR}/vendas & \
+	 ${DATADOG_ENV} DD_SERVICE=flowbridge-estoque python3 ${SOURCEDIR}/server.py 4220 ${BASEDIR}/estoque & \
 	 wait;
 
 # Encerra qualquer processo nas portas usadas
