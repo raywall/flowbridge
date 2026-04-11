@@ -302,13 +302,13 @@ https://org.github.io/time-estoque/diagrams/estoque.mmd
 
 No diagrama do time de vendas:
 
-```mermaid
+```txt
 click stock "ext:https://org.github.io/time-estoque/diagrams/estoque.mmd" "Abrir fluxo de estoque"
 ```
 
 No diagrama do time de estoque:
 
-```mermaid
+```txt
 click sales "ext:https://org.github.io/time-vendas/diagrams/vendas.mmd" "Abrir fluxo de vendas"
 ```
 
@@ -318,14 +318,14 @@ O único requisito é que os arquivos `.mmd` estejam acessíveis via HTTP e perm
 
 Evite usar `end` como id de nó:
 
-```mermaid
+```txt
 flowchart LR
   end([Fim])
 ```
 
 `end` é uma palavra reservada usada pelo Mermaid para fechar `subgraph`. Prefira nomes como:
 
-```mermaid
+```txt
 flowchart LR
   finish([Fim])
 ```
@@ -347,4 +347,3 @@ flowchart LR
   viewer.start();
 </script>
 ```
-# flowbridge
