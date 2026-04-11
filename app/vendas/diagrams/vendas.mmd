@@ -1,0 +1,17 @@
+%% title: Fluxo de vendas
+flowchart LR
+  start([Inicio]):::start
+  receive[Receber pedido]
+  customer[Validar cliente]
+  stock[Consultar estoque]:::external
+  payment[Autorizar pagamento]
+  invoice[Emitir nota fiscal]
+  finish([Fim]):::success
+
+  start --> receive --> customer --> stock --> payment --> invoice --> finish
+
+  click stock "ext:http://localhost:4220/diagrams/estoque.mmd" "Abrir fluxo de estoque"
+
+  classDef start fill:#dbeafe,stroke:#2563eb,color:#1e40af,font-weight:bold
+  classDef success fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
+  classDef external fill:#f5f3ff,stroke:#7c3aed,color:#5b21b6,stroke-dasharray:6 3,stroke-width:2px

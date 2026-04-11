@@ -1,0 +1,59 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag da release, por exemplo v1.0.0. Se vazio, uma tag automatica sera criada."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: criar release do flowbridge
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: baixar codigo
+        uses: actions/checkout@v4
+
+      - name: definir versao
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            version="${{ inputs.version }}"
+          else
+            version="v$(date -u +'%Y.%m.%d')-${GITHUB_RUN_NUMBER}"
+          fi
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: preparar pacote
+        shell: bash
+        run: |
+          test -f app/shared/flowbridge.js
+
+          mkdir -p dist/flowbridge
+          cp -R app/shared/. dist/flowbridge/
+
+          tar -czf "flowbridge-${{ steps.version.outputs.version }}.tar.gz" -C dist flowbridge
+          (cd dist && zip -r "../flowbridge-${{ steps.version.outputs.version }}.zip" flowbridge)
+
+      - name: criar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            "app/shared/flowbridge.js#flowbridge.js" \
+            "flowbridge-${{ steps.version.outputs.version }}.tar.gz" \
+            "flowbridge-${{ steps.version.outputs.version }}.zip" \
+            --title "flowbridge ${{ steps.version.outputs.version }}" \
+            --notes "Release gerada a partir da branch main contendo apenas os arquivos de app/shared."
