@@ -8,7 +8,7 @@
 
 Ele permite que uma página de documentação carregue um arquivo `.mmd`, renderize o diagrama na própria página e navegue para diagramas de outros times a partir de links declarados no próprio Mermaid.
 
-A ideia é simples: cada time publica seus fluxos funcionais como arquivos `.mmd` no seu GitHub Pages, portal de docs ou site estático. Quando um fluxo depende de outro serviço, o nó do diagrama aponta para o `.mmd` desse outro serviço. O usuário clica no nó e o `flowbridge` substitui a visualização atual pelo diagrama referenciado, mantendo a opção de voltar.
+A ideia é simples: cada time publica seus fluxos funcionais como arquivos `.mmd` no seu GitHub Pages, portal de docs ou site estático. Quando um fluxo depende de outro serviço, o nó do diagrama aponta para o `.mmd` desse outro serviço. O usuário clica no nó e o `flowbridge` substitui a visualização atual pelo diagrama referenciado, mantendo a opção de resetar a visualização para o diagrama original da página.
 
 ![preview do flowbridge](src/preview.gif)
 
@@ -21,9 +21,10 @@ Com `flowbridge`, cada time continua dono do seu diagrama, mas os fluxos podem s
 - o diagrama inicial é carregado de um arquivo `.mmd`;
 - links externos são declarados com `click NODE "ext:URL"`;
 - ao clicar em um nó externo, o diagrama de destino é carregado no mesmo viewer;
-- o botão de voltar retorna ao diagrama anterior;
+- o botão de reset retorna ao diagrama original da página e à posição inicial;
+- o botão de expandir abre o desenho em um popup maior, mantendo zoom, arraste e navegação por clique;
 - o botão de download baixa o `.mmd` exibido;
-- o zoom permite aproximar, reduzir e arrastar o desenho para análise.
+- a roda do mouse aproxima ou reduz o desenho, e o arraste move a visualização.
 
 ## Estrutura do exemplo
 
@@ -216,25 +217,20 @@ const viewer = new window.Flowbridge.Viewer({
   height: 520,
 
   showToolbar: true,
-  showBackButton: true,
+  showViewControls: true,
   showDownloadButton: true,
 
-  backLabel: "Voltar",
+  resetViewLabel: "Resetar visualizacao",
+  expandLabel: "Expandir diagrama",
+  closeModalLabel: "Fechar",
   downloadLabel: "Baixar diagrama",
 
-  backIcon: '<i class="fa-solid fa-rotate-left"></i>',
+  resetViewIcon: '<i class="fa-solid fa-arrows-rotate"></i>',
+  expandIcon: '<i class="fa-solid fa-expand"></i>',
+  closeModalIcon: '<i class="fa-solid fa-xmark"></i>',
   downloadIcon: '<i class="fa-solid fa-cloud-arrow-down"></i>',
 
   enableZoom: true,
-  showZoomControls: true,
-  zoomInLabel: "Aumentar zoom",
-  zoomOutLabel: "Reduzir zoom",
-  resetZoomLabel: "Resetar zoom",
-
-  zoomInIcon: '<i class="fa-solid fa-plus"></i>',
-  zoomOutIcon: '<i class="fa-solid fa-minus"></i>',
-  resetZoomIcon: '<i class="fa-solid fa-magnifying-glass"></i>',
-
   minZoom: 0.25,
   maxZoom: 4,
   zoomStep: 0.2,
@@ -252,11 +248,15 @@ const viewer = new window.Flowbridge.Viewer({
 | Opção | Padrão | Descrição |
 |---|---:|---|
 | `showToolbar` | `true` | Mostra ou oculta a barra superior do viewer. |
-| `showBackButton` | `true` | Mostra ou oculta o botão de voltar. |
+| `showViewControls` | `true` | Mostra ou oculta os botões de reset e expandir. |
 | `showDownloadButton` | `true` | Mostra ou oculta o botão de download do `.mmd`. |
-| `backLabel` | `"Voltar"` | Texto usado no tooltip e no `aria-label` do botão de voltar. |
+| `resetViewLabel` | `"Resetar visualizacao"` | Texto usado no tooltip e no `aria-label` do botão de reset. |
+| `expandLabel` | `"Expandir diagrama"` | Texto usado no tooltip, no `aria-label` do botão de expandir e no dialog do popup. |
+| `closeModalLabel` | `"Fechar"` | Texto usado no tooltip e no `aria-label` do botão de fechar o popup. |
 | `downloadLabel` | `"Baixar diagrama"` | Texto usado no tooltip e no `aria-label` do botão de download. |
-| `backIcon` | Font Awesome `fa-rotate-left` | HTML do ícone do botão de voltar. |
+| `resetViewIcon` | Font Awesome `fa-arrows-rotate` | HTML do ícone do botão de reset. |
+| `expandIcon` | Font Awesome `fa-expand` | HTML do ícone do botão de expandir. |
+| `closeModalIcon` | Font Awesome `fa-xmark` | HTML do ícone do botão de fechar o popup. |
 | `downloadIcon` | Font Awesome `fa-cloud-arrow-down` | HTML do ícone do botão de download. |
 
 Os botões usam apenas ícones na tela. Os labels ficam em `title` e `aria-label`, então continuam disponíveis como tooltip e para tecnologias assistivas.
@@ -266,23 +266,16 @@ Os botões usam apenas ícones na tela. Os labels ficam em `title` e `aria-label
 | Opção | Padrão | Descrição |
 |---|---:|---|
 | `enableZoom` | `true` | Ativa zoom e movimentação do diagrama. |
-| `showZoomControls` | `true` | Mostra ou oculta os botões de zoom. |
-| `zoomInLabel` | `"Aumentar zoom"` | Tooltip e `aria-label` do botão de aumentar zoom. |
-| `zoomOutLabel` | `"Reduzir zoom"` | Tooltip e `aria-label` do botão de reduzir zoom. |
-| `resetZoomLabel` | `"Resetar zoom"` | Tooltip e `aria-label` do botão de resetar zoom. |
-| `zoomInIcon` | Font Awesome `fa-plus` | HTML do ícone de aumentar zoom. |
-| `zoomOutIcon` | Font Awesome `fa-minus` | HTML do ícone de reduzir zoom. |
-| `resetZoomIcon` | Font Awesome `fa-magnifying-glass` | HTML do ícone de resetar zoom. |
 | `minZoom` | `0.25` | Menor escala permitida. |
 | `maxZoom` | `4` | Maior escala permitida. |
-| `zoomStep` | `0.2` | Incremento aplicado a cada ação de zoom. |
+| `zoomStep` | `0.2` | Incremento aplicado a cada ação de zoom pela roda do mouse. |
 
 Com o zoom ativo:
 
 - use a roda do mouse para aproximar ou reduzir;
-- use os botões de zoom para controlar a escala;
 - arraste o diagrama para mover a visualização;
-- clique em um nó externo para navegar para outro `.mmd`.
+- clique em um nó externo para navegar para outro `.mmd`;
+- no popup expandido, os mesmos controles de zoom, arraste e clique continuam ativos.
 
 ## Download do diagrama
 

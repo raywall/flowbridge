@@ -5,20 +5,21 @@
   const DEFAULT_OPTIONS = {
     height: 560,
     showToolbar: true,
-    showBackButton: true,
+    showBackButton: false,
     showDownloadButton: true,
     backLabel: "Voltar",
     downloadLabel: "Baixar diagrama",
     backIcon: '<i class="fa-solid fa-rotate-left"></i>',
     downloadIcon: '<i class="fa-solid fa-cloud-arrow-down"></i>',
     enableZoom: true,
+    showViewControls: true,
     showZoomControls: true,
-    zoomInLabel: "Aumentar zoom",
-    zoomOutLabel: "Reduzir zoom",
-    resetZoomLabel: "Resetar zoom",
-    zoomInIcon: '<i class="fa-solid fa-plus"></i>',
-    zoomOutIcon: '<i class="fa-solid fa-minus"></i>',
-    resetZoomIcon: '<i class="fa-solid fa-magnifying-glass"></i>',
+    resetViewLabel: "Resetar visualizacao",
+    expandLabel: "Expandir diagrama",
+    closeModalLabel: "Fechar",
+    resetViewIcon: '<i class="fa-solid fa-arrows-rotate"></i>',
+    expandIcon: '<i class="fa-solid fa-expand"></i>',
+    closeModalIcon: '<i class="fa-solid fa-xmark"></i>',
     minZoom: 0.25,
     maxZoom: 4,
     zoomStep: 0.2,
@@ -174,6 +175,14 @@
         lastX: 0,
         lastY: 0,
       };
+      this.modalZoom = {
+        scale: 1,
+        x: 0,
+        y: 0,
+        dragging: false,
+        lastX: 0,
+        lastY: 0,
+      };
 
       this.root.classList.add("distributed-mermaid-viewer");
       this.root.innerHTML = this.buildShell();
@@ -182,41 +191,46 @@
       this.fileEl = this.root.querySelector("[data-role='file']");
       this.backBtn = this.root.querySelector("[data-role='back']");
       this.downloadBtn = this.root.querySelector("[data-role='download']");
-      this.zoomInBtn = this.root.querySelector("[data-role='zoom-in']");
-      this.zoomOutBtn = this.root.querySelector("[data-role='zoom-out']");
-      this.resetZoomBtn = this.root.querySelector("[data-role='reset-zoom']");
+      this.resetViewBtn = this.root.querySelector("[data-role='reset-view']");
+      this.expandBtn = this.root.querySelector("[data-role='expand']");
+      this.closeModalBtn = this.root.querySelector("[data-role='close-modal']");
       this.statusEl = this.root.querySelector("[data-role='status']");
       this.canvasEl = this.root.querySelector("[data-role='canvas']");
       this.stageEl = this.root.querySelector("[data-role='stage']");
+      this.modalEl = this.root.querySelector("[data-role='modal']");
+      this.modalDialogEl = this.root.querySelector("[data-role='modal-dialog']");
+      this.modalStageEl = this.root.querySelector("[data-role='modal-stage']");
 
       this.canvasEl.style.minHeight = `${merged.height}px`;
       this.backBtn?.addEventListener("click", () => this.goBack());
       this.downloadBtn?.addEventListener("click", () => this.downloadCurrent());
-      this.zoomInBtn?.addEventListener("click", () => this.zoomBy(1));
-      this.zoomOutBtn?.addEventListener("click", () => this.zoomBy(-1));
-      this.resetZoomBtn?.addEventListener("click", () => this.resetZoom());
+      this.resetViewBtn?.addEventListener("click", () => this.resetView());
+      this.expandBtn?.addEventListener("click", () => this.openModal());
+      this.closeModalBtn?.addEventListener("click", () => this.closeModal());
+      this.modalEl?.addEventListener("click", (event) => {
+        if (event.target === this.modalEl) this.closeModal();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") this.closeModal();
+      });
       this.attachPanZoomHandlers();
+      this.attachModalPanZoomHandlers();
     }
 
     buildShell() {
-      const zoomControls =
-        this.options.enableZoom && this.options.showZoomControls
+      const viewControls =
+        this.options.showViewControls && this.options.showZoomControls
           ? `
-            <div class="dm-zoom-actions" aria-label="Controles de zoom">
+            <div class="dm-view-actions" aria-label="Controles de visualizacao">
               ${iconButton({
-                role: "zoom-out",
-                label: this.options.zoomOutLabel,
-                icon: this.options.zoomOutIcon,
+                role: "reset-view",
+                label: this.options.resetViewLabel,
+                icon: this.options.resetViewIcon,
               })}
               ${iconButton({
-                role: "reset-zoom",
-                label: this.options.resetZoomLabel,
-                icon: this.options.resetZoomIcon,
-              })}
-              ${iconButton({
-                role: "zoom-in",
-                label: this.options.zoomInLabel,
-                icon: this.options.zoomInIcon,
+                role: "expand",
+                label: this.options.expandLabel,
+                icon: this.options.expandIcon,
               })}
             </div>
           `
@@ -229,7 +243,7 @@
             <div class="dm-file" data-role="file"></div>
           </div>
           <div class="dm-actions">
-            ${zoomControls}
+            ${viewControls}
             ${
               this.options.showBackButton
                 ? iconButton({
@@ -255,6 +269,14 @@
         <div class="dm-canvas" data-role="canvas">
           <div class="dm-stage" data-role="stage"></div>
         </div>
+        <div class="dm-modal" data-role="modal" aria-hidden="true">
+          <div class="dm-modal-dialog" data-role="modal-dialog" role="dialog" aria-modal="true" aria-label="${escapeHtml(this.options.expandLabel)}">
+            <button class="dm-modal-close" type="button" data-role="close-modal" title="${escapeHtml(this.options.closeModalLabel)}" aria-label="${escapeHtml(this.options.closeModalLabel)}">
+              <span class="dm-icon" aria-hidden="true">${this.options.closeModalIcon}</span>
+            </button>
+            <div class="dm-modal-stage" data-role="modal-stage"></div>
+          </div>
+        </div>
       `;
     }
 
@@ -275,11 +297,15 @@
     }
 
     async open(src, options = {}) {
-      const { pushHistory = true } = options;
+      const { pushHistory = true, clearHistory = false } = options;
 
       try {
         this.setStatus("Carregando diagrama...");
         const next = await loadDiagram(src, this.options);
+
+        if (clearHistory) {
+          this.history = [];
+        }
 
         if (pushHistory && this.current) {
           this.history.push(this.current.src);
@@ -304,6 +330,7 @@
 
       this.stageEl.innerHTML = svg;
       this.resetZoom();
+      this.closeModal();
 
       if (result.bindFunctions) {
         result.bindFunctions(this.stageEl);
@@ -312,34 +339,40 @@
       this.decorateExternalLinks();
     }
 
-    decorateExternalLinks() {
-      this.decorateHrefLinks();
-      this.decorateNodeLinks();
+    decorateExternalLinks(root = this.stageEl) {
+      this.decorateHrefLinks(root);
+      this.decorateNodeLinks(root);
     }
 
-    decorateHrefLinks() {
-      const anchors = this.stageEl.querySelectorAll("a[href], a[*|href]");
+    decorateHrefLinks(root = this.stageEl) {
+      const anchors = root.querySelectorAll("a[href], a[*|href]");
 
       anchors.forEach((anchor) => {
         const raw =
           anchor.getAttribute("href") ||
           anchor.getAttributeNS("http://www.w3.org/1999/xlink", "href") ||
           "";
+        const linkedSrc = anchor.dataset.dmLinked || "";
 
-        if (!raw.startsWith(EXT_PREFIX)) return;
+        if (!raw.startsWith(EXT_PREFIX) && !linkedSrc) return;
+
+        const targetSrc = raw.startsWith(EXT_PREFIX)
+          ? raw.slice(EXT_PREFIX.length).trim()
+          : linkedSrc;
 
         const target = {
-          src: normalizeUrl(raw.slice(EXT_PREFIX.length).trim(), this.current.src),
-          title: getFileName(raw.slice(EXT_PREFIX.length).trim()),
+          src: normalizeUrl(targetSrc, this.current.src),
+          title: getFileName(targetSrc),
         };
 
         anchor.setAttribute("href", "#");
         anchor.removeAttribute("target");
+        delete anchor.dataset.dmLinked;
         this.makeClickable(anchor, target);
       });
     }
 
-    decorateNodeLinks() {
+    decorateNodeLinks(root = this.stageEl) {
       for (const [nodeId, target] of this.current.links.entries()) {
         const selectors = [
           `#${escapeCssId(nodeId)}`,
@@ -351,14 +384,30 @@
 
         let node = null;
         for (const selector of selectors) {
-          node = this.stageEl.querySelector(selector);
+          node = root.querySelector(selector);
           if (node) break;
         }
 
         if (node) {
+          delete node.dataset.dmLinked;
           this.makeClickable(node, target);
         }
       }
+    }
+
+    async resetView() {
+      if (!this.current || this.current.src === this.initialSrc) {
+        this.history = [];
+        this.updateToolbar();
+        this.resetZoom();
+        this.closeModal();
+        return;
+      }
+
+      await this.open(this.initialSrc, {
+        pushHistory: false,
+        clearHistory: true,
+      });
     }
 
     makeClickable(node, target) {
@@ -453,6 +502,57 @@
       });
     }
 
+    attachModalPanZoomHandlers() {
+      if (!this.options.enableZoom || !this.modalDialogEl) return;
+
+      this.modalDialogEl.addEventListener(
+        "wheel",
+        (event) => {
+          event.preventDefault();
+          this.modalZoomAt(
+            event.deltaY < 0 ? 1 : -1,
+            event.clientX,
+            event.clientY
+          );
+        },
+        { passive: false }
+      );
+
+      this.modalDialogEl.addEventListener("pointerdown", (event) => {
+        const target = event.target;
+        const isBlocked =
+          target instanceof Element &&
+          (target.closest(".dm-clickable") ||
+            target.closest("[data-role='close-modal']"));
+
+        if (event.button !== 0 || isBlocked) return;
+
+        this.modalZoom.dragging = true;
+        this.modalZoom.lastX = event.clientX;
+        this.modalZoom.lastY = event.clientY;
+        this.modalDialogEl.classList.add("dm-modal-dialog--dragging");
+        this.modalDialogEl.setPointerCapture(event.pointerId);
+      });
+
+      this.modalDialogEl.addEventListener("pointermove", (event) => {
+        if (!this.modalZoom.dragging) return;
+
+        this.modalZoom.x += event.clientX - this.modalZoom.lastX;
+        this.modalZoom.y += event.clientY - this.modalZoom.lastY;
+        this.modalZoom.lastX = event.clientX;
+        this.modalZoom.lastY = event.clientY;
+        this.applyModalZoom();
+      });
+
+      this.modalDialogEl.addEventListener("pointerup", (event) => {
+        this.stopModalDragging(event);
+      });
+
+      this.modalDialogEl.addEventListener("pointercancel", (event) => {
+        this.stopModalDragging(event);
+      });
+    }
+
     stopDragging(event) {
       if (!this.zoom.dragging) return;
 
@@ -493,6 +593,39 @@
       this.applyZoom();
     }
 
+    stopModalDragging(event) {
+      if (!this.modalZoom.dragging || !this.modalDialogEl) return;
+
+      this.modalZoom.dragging = false;
+      this.modalDialogEl.classList.remove("dm-modal-dialog--dragging");
+
+      if (this.modalDialogEl.hasPointerCapture(event.pointerId)) {
+        this.modalDialogEl.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    modalZoomAt(direction, clientX, clientY) {
+      if (!this.modalDialogEl) return;
+
+      const rect = this.modalDialogEl.getBoundingClientRect();
+      const previousScale = this.modalZoom.scale;
+      const nextScale = this.clampZoom(
+        previousScale + direction * this.options.zoomStep
+      );
+
+      if (nextScale === previousScale) return;
+
+      const pointX = clientX - rect.left;
+      const pointY = clientY - rect.top;
+      const contentX = (pointX - this.modalZoom.x) / previousScale;
+      const contentY = (pointY - this.modalZoom.y) / previousScale;
+
+      this.modalZoom.scale = nextScale;
+      this.modalZoom.x = pointX - contentX * nextScale;
+      this.modalZoom.y = pointY - contentY * nextScale;
+      this.applyModalZoom();
+    }
+
     clampZoom(value) {
       return Math.min(
         this.options.maxZoom,
@@ -511,6 +644,46 @@
       if (!this.stageEl) return;
 
       this.stageEl.style.transform = `translate(${this.zoom.x}px, ${this.zoom.y}px) scale(${this.zoom.scale})`;
+    }
+
+    resetModalZoom() {
+      this.modalZoom.scale = 1;
+      this.modalZoom.x = 0;
+      this.modalZoom.y = 0;
+      this.applyModalZoom();
+    }
+
+    applyModalZoom() {
+      if (!this.modalStageEl) return;
+
+      this.modalStageEl.style.transform = `translate(${this.modalZoom.x}px, ${this.modalZoom.y}px) scale(${this.modalZoom.scale})`;
+    }
+
+    openModal() {
+      if (!this.modalEl || !this.modalStageEl || !this.stageEl.innerHTML) return;
+
+      this.modalStageEl.innerHTML = this.stageEl.innerHTML;
+      this.resetModalZoom();
+      this.decorateExternalLinks(this.modalStageEl);
+      this.modalEl.classList.add("dm-modal--open");
+      this.modalEl.setAttribute("aria-hidden", "false");
+      document.body.classList.add("dm-modal-open");
+      this.closeModalBtn?.focus();
+    }
+
+    closeModal() {
+      if (!this.modalEl || !this.modalEl.classList.contains("dm-modal--open")) {
+        return;
+      }
+
+      this.modalZoom.dragging = false;
+      this.modalDialogEl?.classList.remove("dm-modal-dialog--dragging");
+      this.modalEl.classList.remove("dm-modal--open");
+      this.modalEl.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("dm-modal-open");
+      if (this.modalStageEl) this.modalStageEl.innerHTML = "";
+      this.resetModalZoom();
+      this.expandBtn?.focus();
     }
   }
 
@@ -550,7 +723,7 @@
       }
 
       .dm-actions,
-      .dm-zoom-actions {
+      .dm-view-actions {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -616,6 +789,9 @@
         min-height: inherit;
         transform-origin: 0 0;
         transition: transform 120ms ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .dm-canvas--dragging .dm-stage {
@@ -626,7 +802,94 @@
         display: block;
         max-width: none;
         height: auto;
-        margin: 0 auto;
+        margin: 0;
+      }
+
+      body.dm-modal-open {
+        overflow: hidden;
+      }
+
+      .dm-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(31, 35, 40, 0.65);
+        padding: 32px;
+      }
+
+      .dm-modal--open {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .dm-modal-dialog {
+        position: relative;
+        width: min(1200px, 96vw);
+        height: min(820px, 90vh);
+        overflow: hidden;
+        cursor: grab;
+        touch-action: none;
+        border: 1px solid #d0d7de;
+        border-radius: 8px;
+        background: #fff;
+        padding: 48px 24px 24px;
+      }
+
+      .dm-modal-dialog--dragging {
+        cursor: grabbing;
+      }
+
+      .dm-modal-dialog--dragging .dm-modal-stage {
+        transition: none;
+      }
+
+      .dm-modal-close {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 1;
+        border: 1px solid #d0d7de;
+        background: #f6f8fa;
+        color: #24292f;
+        border-radius: 8px;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        font-size: 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .dm-modal-stage {
+        min-width: 100%;
+        min-height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform-origin: 0 0;
+        transition: transform 120ms ease;
+      }
+
+      .dm-modal-stage svg {
+        display: block;
+        max-width: none;
+        height: auto;
+      }
+
+      @media (max-width: 640px) {
+        .dm-modal {
+          padding: 12px;
+        }
+
+        .dm-modal-dialog {
+          width: 100%;
+          height: 92vh;
+          padding: 56px 12px 16px;
+        }
       }
 
       .dm-clickable,
