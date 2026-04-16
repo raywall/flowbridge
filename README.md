@@ -32,6 +32,7 @@ Com `flowbridge`, cada time continua dono do seu diagrama, mas os fluxos podem s
 flowbridge/
 ├── app/
 │   ├── shared/
+│   │   ├── flowbridge.css
 │   │   └── flowbridge.js
 │   ├── vendas/
 │   │   ├── diagrams/
@@ -51,7 +52,7 @@ flowbridge/
 
 No exemplo local:
 
-- `http://localhost:4200` serve o plugin `flowbridge.js`;
+- `http://localhost:4200` serve o plugin `flowbridge.js` e seus estilos `flowbridge.css`;
 - `http://localhost:4210` serve a documentação de vendas;
 - `http://localhost:4220` serve a documentação de estoque.
 
@@ -153,6 +154,27 @@ flowchart LR
 
   click stock "ext:http://localhost:4220/diagrams/estoque.mmd" "Abrir fluxo de estoque"
 
+  %% @tooltip receive
+  %%   title: Receber Pedido
+  %%   description: Valida o payload de entrada e normaliza o contrato antes de prosseguir.
+  %%   owner: time-vendas
+  %%   sla: < 200ms
+  %%   since: 2024-01
+  %%   tags: entrada, critico
+  %%   link: Runbook | https://wiki.empresa.com/vendas/receber
+  %% @end
+
+  %% @tooltip stock
+  %%   title: Consultar Estoque
+  %%   description: Chamada sincrona com timeout de 3s e fallback para cache Redis.
+  %%   owner: time-estoque
+  %%   sla: p99 < 500ms
+  %%   alert: Degradacao historica as sextas apos 18h
+  %%   tags: externo, dependencia
+  %%   link: Diagrama de estoque | ext:http://localhost:4220/diagrams/estoque.mmd
+  %%   link: Dashboard          | https://datadog.empresa.com/estoque
+  %% @end
+
   classDef start fill:#dbeafe,stroke:#2563eb,color:#1e40af,font-weight:bold
   classDef success fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
   classDef external fill:#f5f3ff,stroke:#7c3aed,color:#5b21b6,stroke-dasharray:6 3,stroke-width:2px
@@ -162,11 +184,49 @@ O comentário `%% title: ...` é opcional, mas recomendado. O viewer usa esse va
 
 O prefixo `ext:` indica que aquele link deve ser tratado pelo `flowbridge`. Em vez de abrir outra aba ou um popup, o viewer carrega o diagrama referenciado dentro da mesma área da página.
 
+### Tooltips e anotações
+
+O `flowbridge` também lê comentários Mermaid para exibir detalhes ao passar o mouse ou focar um node.
+
+Use `@tooltip` para declarar metadados separados por node:
+
+```mermaid
+%% @tooltip receive
+%%   title: Receber Pedido
+%%   description: Valida o payload de entrada e normaliza o contrato antes de prosseguir.
+%%   owner: time-vendas
+%%   sla: < 200ms
+%%   since: 2024-01
+%%   tags: entrada, critico
+%%   link: Runbook | https://wiki.empresa.com/vendas/receber
+%% @end
+```
+
+Campos comuns como `owner`, `sla`, `since`, `tags` e `alert` aparecem como atributos estruturados. O campo `description` vira o texto principal.
+
+Você pode declarar mais de um `link`. Links com `ext:` navegam pelo próprio `flowbridge`; links HTTP/HTTPS abrem em outra aba.
+
+```mermaid
+%% @tooltip stock
+%%   title: Consultar Estoque
+%%   description: Chamada sincrona com timeout de 3s e fallback para cache Redis.
+%%   link: Diagrama de estoque | ext:http://localhost:4220/diagrams/estoque.mmd
+%%   link: Dashboard          | https://datadog.empresa.com/estoque
+%% @end
+```
+
+O formato é sempre baseado no `id` do node Mermaid. No exemplo acima, `receive` e `stock` precisam existir no `flowchart`.
+
 ## Como implementar em uma página
 
-Inclua Mermaid, Font Awesome e o plugin:
+Inclua Mermaid, Font Awesome, o CSS do `flowbridge` e o plugin:
 
 ```html
+<link
+  rel="stylesheet"
+  href="https://sua-org.github.io/seu-repo/flowbridge.css"
+/>
+
 <link
   rel="stylesheet"
   href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"

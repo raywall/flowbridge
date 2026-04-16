@@ -116,6 +116,202 @@
     return links;
   }
 
+  function stripMermaidComment(line) {
+    return String(line || "").replace(/^\s*%%\s?/, "");
+  }
+
+  function parseAnnotationText(text) {
+    const raw = String(text || "").trim();
+    if (!raw) {
+      return { title: "Detalhes", body: "", fields: [], links: [] };
+    }
+
+    const parts = raw.split(/\s+\|\s+/);
+    if (parts.length > 1) {
+      return {
+        title: parts.shift().trim() || "Detalhes",
+        body: parts.join(" | ").trim(),
+        fields: [],
+        links: [],
+      };
+    }
+
+    return { title: "Detalhes", body: raw, fields: [], links: [] };
+  }
+
+  function normalizeAnnotationKey(key) {
+    return String(key || "").trim().toLowerCase();
+  }
+
+  function humanizeAnnotationKey(key) {
+    const labels = {
+      owner: "Owner",
+      sla: "SLA",
+      since: "Desde",
+      tags: "Tags",
+      alert: "Alerta",
+      description: "Descricao",
+    };
+    const normalized = normalizeAnnotationKey(key);
+    return labels[normalized] || String(key || "").trim();
+  }
+
+  function parseAnnotationLink(value) {
+    const parts = String(value || "").split(/\s+\|\s+/);
+    if (parts.length > 1) {
+      return {
+        label: parts.shift().trim() || parts.join(" | ").trim(),
+        href: parts.join(" | ").trim(),
+      };
+    }
+
+    return {
+      label: String(value || "").trim(),
+      href: String(value || "").trim(),
+    };
+  }
+
+  function parseAnnotationBlock(lines) {
+    const cleanLines = lines.map(stripMermaidComment);
+    let title = "";
+    const body = [];
+    const fields = [];
+    const links = [];
+    let readingBody = false;
+
+    cleanLines.forEach((line) => {
+      const titleMatch = line.match(/^\s*title\s*:\s*(.+)$/i);
+      const bodyMatch = line.match(/^\s*body\s*:\s*$/i);
+      const keyValueMatch = line.match(/^\s*([a-zA-Z][\w-]*)\s*:\s*(.*)$/);
+      const headingMatch = line.match(/^\s*#\s+(.+)$/);
+
+      if (!readingBody && titleMatch) {
+        title = titleMatch[1].trim();
+        return;
+      }
+
+      if (!readingBody && headingMatch && !title) {
+        title = headingMatch[1].trim();
+        return;
+      }
+
+      if (bodyMatch) {
+        readingBody = true;
+        return;
+      }
+
+      if (!readingBody && keyValueMatch) {
+        const key = normalizeAnnotationKey(keyValueMatch[1]);
+        const value = keyValueMatch[2].trim();
+
+        if (key === "description") {
+          body.push(value);
+          return;
+        }
+
+        if (key === "link") {
+          links.push(parseAnnotationLink(value));
+          return;
+        }
+
+        fields.push({
+          key,
+          label: humanizeAnnotationKey(key),
+          value,
+        });
+        return;
+      }
+
+      body.push(line);
+    });
+
+    if (!title) {
+      const firstTextLine = body.find((line) => line.trim());
+      title = firstTextLine ? firstTextLine.trim() : "Detalhes";
+      if (firstTextLine) {
+        body.splice(body.indexOf(firstTextLine), 1);
+      }
+    }
+
+    return {
+      title,
+      body: body.join("\n").trim(),
+      fields,
+      links,
+    };
+  }
+
+  function parseNodeAnnotations(content) {
+    const annotations = new Map();
+    const lines = String(content || "").split(/\r?\n/);
+    const inlinePattern =
+      /^\s*%%\s*(?:flowbridge:)?(?:tooltip|annotation)\s+([^\s:|]+)\s*(?::|\|)\s*(.+)$/i;
+    const blockStartPattern =
+      /^\s*%%\s*@?(?:flowbridge:)?(?:tooltip|annotation)\s+([^\s:|]+)\s*$/i;
+    const blockEndPattern =
+      /^\s*%%\s*@?(?:end(?:tooltip|annotation)?|endflowbridge)\s*$/i;
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      const inline = line.match(inlinePattern);
+      if (inline) {
+        annotations.set(inline[1], parseAnnotationText(inline[2]));
+        continue;
+      }
+
+      const block = line.match(blockStartPattern);
+      if (!block) continue;
+
+      const nodeId = block[1];
+      const blockLines = [];
+      index += 1;
+
+      while (index < lines.length && !blockEndPattern.test(lines[index])) {
+        blockLines.push(lines[index]);
+        index += 1;
+      }
+
+      annotations.set(nodeId, parseAnnotationBlock(blockLines));
+    }
+
+    return annotations;
+  }
+
+  function normalizeText(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function cleanNodeLabel(value) {
+    return String(value || "")
+      .replace(/^["']|["']$/g, "")
+      .replace(/<br\s*\/?>/gi, " ")
+      .replace(/<[^>]+>/g, "")
+      .trim();
+  }
+
+  function parseNodeLabels(content) {
+    const labels = new Map();
+    const lines = String(content || "").split(/\r?\n/);
+    const nodePattern =
+      /^\s*([A-Za-z][\w-]*)\s*(?:\(\[|\[\(|\[\[|\(\(|\[|\(|\{)(.+?)(?:\]\)|\]\]|\)\]|\)\)|\]|\)|\})/;
+
+    lines.forEach((line) => {
+      if (/^\s*%%/.test(line) || /^\s*(click|classDef|class|style|linkStyle)\b/i.test(line)) {
+        return;
+      }
+
+      const match = line.match(nodePattern);
+      if (!match) return;
+
+      labels.set(match[1], cleanNodeLabel(match[2]));
+    });
+
+    return labels;
+  }
+
   async function fetchText(url, options) {
     const fetchOptions = { ...DEFAULT_OPTIONS.fetchOptions, ...(options || {}) };
     const response = await fetch(url, fetchOptions);
@@ -140,6 +336,8 @@
       title: extractTitle(content, normalized),
       content,
       links: parseExternalLinks(content, normalized),
+      annotations: parseNodeAnnotations(content),
+      labels: parseNodeLabels(content),
     };
 
     if (options.enableCache !== false) {
@@ -183,6 +381,7 @@
         lastX: 0,
         lastY: 0,
       };
+      this.tooltipHideTimer = null;
 
       this.root.classList.add("distributed-mermaid-viewer");
       this.root.innerHTML = this.buildShell();
@@ -200,6 +399,8 @@
       this.modalEl = this.root.querySelector("[data-role='modal']");
       this.modalDialogEl = this.root.querySelector("[data-role='modal-dialog']");
       this.modalStageEl = this.root.querySelector("[data-role='modal-stage']");
+      this.tooltipEl = this.root.querySelector("[data-role='tooltip']");
+      this.annotationNodes = new WeakMap();
 
       this.canvasEl.style.minHeight = `${merged.height}px`;
       this.backBtn?.addEventListener("click", () => this.goBack());
@@ -207,9 +408,23 @@
       this.resetViewBtn?.addEventListener("click", () => this.resetView());
       this.expandBtn?.addEventListener("click", () => this.openModal());
       this.closeModalBtn?.addEventListener("click", () => this.closeModal());
+      this.tooltipEl?.addEventListener("pointerenter", () => this.cancelTooltipHide());
+      this.tooltipEl?.addEventListener("pointerleave", () => this.scheduleTooltipHide());
       this.modalEl?.addEventListener("click", (event) => {
         if (event.target === this.modalEl) this.closeModal();
       });
+      this.stageEl?.addEventListener("mousemove", (event) =>
+        this.handleDelegatedAnnotationHover(event)
+      );
+      this.stageEl?.addEventListener("mouseleave", () => this.scheduleTooltipHide());
+      this.stageEl?.addEventListener("focusin", (event) =>
+        this.handleDelegatedAnnotationHover(event)
+      );
+      this.stageEl?.addEventListener("focusout", () => this.scheduleTooltipHide());
+      this.modalStageEl?.addEventListener("mousemove", (event) =>
+        this.handleDelegatedAnnotationHover(event)
+      );
+      this.modalStageEl?.addEventListener("mouseleave", () => this.scheduleTooltipHide());
       document.addEventListener("keydown", (event) => {
         if (event.key === "Escape") this.closeModal();
       });
@@ -269,6 +484,7 @@
         <div class="dm-canvas" data-role="canvas">
           <div class="dm-stage" data-role="stage"></div>
         </div>
+        <div class="dm-tooltip" data-role="tooltip" role="tooltip" hidden></div>
         <div class="dm-modal" data-role="modal" aria-hidden="true">
           <div class="dm-modal-dialog" data-role="modal-dialog" role="dialog" aria-modal="true" aria-label="${escapeHtml(this.options.expandLabel)}">
             <button class="dm-modal-close" type="button" data-role="close-modal" title="${escapeHtml(this.options.closeModalLabel)}" aria-label="${escapeHtml(this.options.closeModalLabel)}">
@@ -331,6 +547,7 @@
       this.stageEl.innerHTML = svg;
       this.resetZoom();
       this.closeModal();
+      this.hideTooltip();
 
       if (result.bindFunctions) {
         result.bindFunctions(this.stageEl);
@@ -340,8 +557,15 @@
     }
 
     decorateExternalLinks(root = this.stageEl) {
+      this.removeMermaidTooltips(root);
       this.decorateHrefLinks(root);
       this.decorateNodeLinks(root);
+      this.decorateNodeAnnotations(root);
+    }
+
+    removeMermaidTooltips(root = this.stageEl) {
+      root.querySelectorAll("title").forEach((title) => title.remove());
+      root.querySelectorAll("[title]").forEach((element) => element.removeAttribute("title"));
     }
 
     decorateHrefLinks(root = this.stageEl) {
@@ -374,25 +598,290 @@
 
     decorateNodeLinks(root = this.stageEl) {
       for (const [nodeId, target] of this.current.links.entries()) {
-        const selectors = [
-          `#${escapeCssId(nodeId)}`,
-          `g[id="${nodeId}"]`,
-          `[id="${nodeId}"]`,
-          `#flowchart-${escapeCssId(nodeId)}-0`,
-          `[id^="flowchart-${nodeId}-"]`,
-        ];
-
-        let node = null;
-        for (const selector of selectors) {
-          node = root.querySelector(selector);
-          if (node) break;
-        }
+        const node = this.findRenderedNode(root, nodeId);
 
         if (node) {
           delete node.dataset.dmLinked;
           this.makeClickable(node, target);
         }
       }
+    }
+
+    decorateNodeAnnotations(root = this.stageEl) {
+      if (!this.current?.annotations?.size) return;
+
+      for (const [nodeId, annotation] of this.current.annotations.entries()) {
+        const node = this.findRenderedNode(root, nodeId);
+        if (!node || node.dataset.dmAnnotationBound === "true") continue;
+
+        node.dataset.dmAnnotationBound = "true";
+        node.classList.add("dm-annotated");
+        this.annotationNodes.set(node, annotation);
+
+        if (!node.hasAttribute("tabindex")) {
+          node.setAttribute("tabindex", "0");
+        }
+
+        const show = (event) => this.showTooltip(annotation, event, node);
+        const move = (event) => this.moveTooltip(event);
+        const hide = (event) => {
+          if (event?.relatedTarget && node.contains(event.relatedTarget)) return;
+          this.scheduleTooltipHide();
+        };
+
+        node.addEventListener("pointerenter", show);
+        node.addEventListener("pointermove", move);
+        node.addEventListener("pointerleave", hide);
+        node.addEventListener("mouseover", show);
+        node.addEventListener("mousemove", move);
+        node.addEventListener("mouseout", hide);
+        node.addEventListener("focus", show);
+        node.addEventListener("blur", hide);
+      }
+    }
+
+    findRenderedNode(root, nodeId) {
+      const selectors = [
+        `#${escapeCssId(nodeId)}`,
+        `g[id="${nodeId}"]`,
+        `[id="${nodeId}"]`,
+        `#flowchart-${escapeCssId(nodeId)}-0`,
+        `[id^="flowchart-${nodeId}-"]`,
+        `[data-id="${nodeId}"]`,
+        `[data-node-id="${nodeId}"]`,
+      ];
+
+      for (const selector of selectors) {
+        const node = root.querySelector(selector);
+        if (node) return node;
+      }
+
+      const candidates = root.querySelectorAll("[id], [data-id], [data-node-id]");
+      for (const candidate of candidates) {
+        const id = candidate.getAttribute("id") || "";
+        const dataId = candidate.getAttribute("data-id") || "";
+        const dataNodeId = candidate.getAttribute("data-node-id") || "";
+
+        if (
+          id === nodeId ||
+          dataId === nodeId ||
+          dataNodeId === nodeId ||
+          id.startsWith(`flowchart-${nodeId}-`)
+        ) {
+          return candidate;
+        }
+      }
+
+      const label = this.current?.labels?.get(nodeId);
+      if (label) {
+        return this.findRenderedNodeByLabel(root, label);
+      }
+
+      return null;
+    }
+
+    findRenderedNodeByLabel(root, label) {
+      const expected = normalizeText(label);
+      if (!expected) return null;
+
+      const candidates = root.querySelectorAll("g, text, tspan, span, div");
+      for (const candidate of candidates) {
+        if (normalizeText(candidate.textContent) !== expected) continue;
+
+        return candidate.closest?.("g[id], g.node, g") || candidate;
+      }
+
+      return null;
+    }
+
+    handleDelegatedAnnotationHover(event) {
+      const match = this.findAnnotationFromEvent(event);
+      if (!match) {
+        this.scheduleTooltipHide();
+        return;
+      }
+
+      this.showTooltip(match.annotation, event, match.node);
+    }
+
+    findAnnotationFromEvent(event) {
+      if (!this.current?.annotations?.size) return null;
+
+      const path = typeof event.composedPath === "function"
+        ? event.composedPath()
+        : this.buildEventPath(event.target);
+
+      for (const item of path) {
+        if (!(item instanceof Element)) continue;
+
+        const annotation = this.findAnnotationForElement(item);
+        if (annotation) {
+          return { annotation, node: item };
+        }
+      }
+
+      return null;
+    }
+
+    buildEventPath(target) {
+      const path = [];
+      let current = target;
+
+      while (current) {
+        path.push(current);
+        current = current.parentNode;
+      }
+
+      return path;
+    }
+
+    findAnnotationForElement(element) {
+      const ids = [
+        element.getAttribute("data-id"),
+        element.getAttribute("data-node-id"),
+        element.getAttribute("id"),
+      ].filter(Boolean);
+
+      for (const id of ids) {
+        const exact = this.current.annotations.get(id);
+        if (exact) return exact;
+
+        const flowchartMatch = id.match(/^flowchart-(.+)-\d+$/);
+        if (flowchartMatch && this.current.annotations.has(flowchartMatch[1])) {
+          return this.current.annotations.get(flowchartMatch[1]);
+        }
+
+        for (const [nodeId, annotation] of this.current.annotations.entries()) {
+          if (id.startsWith(`flowchart-${nodeId}-`)) {
+            return annotation;
+          }
+        }
+      }
+
+      const text = normalizeText(element.textContent);
+      if (text) {
+        for (const [nodeId, label] of this.current.labels || []) {
+          if (normalizeText(label) === text && this.current.annotations.has(nodeId)) {
+            return this.current.annotations.get(nodeId);
+          }
+        }
+      }
+
+      return null;
+    }
+
+    showTooltip(annotation, event, node) {
+      if (!this.tooltipEl || !annotation) return;
+
+      this.cancelTooltipHide();
+      this.tooltipEl.innerHTML = this.renderTooltip(annotation);
+      this.bindTooltipLinks(annotation);
+      this.tooltipEl.hidden = false;
+      this.tooltipEl.classList.add("dm-tooltip--visible");
+      this.moveTooltip(event, node);
+    }
+
+    moveTooltip(event, node) {
+      if (!this.tooltipEl || this.tooltipEl.hidden) return;
+
+      const offset = 18;
+      const rect = this.tooltipEl.getBoundingClientRect();
+      const sourceRect = node?.getBoundingClientRect?.();
+      const clientX = Number.isFinite(event?.clientX)
+        ? event.clientX
+        : (sourceRect ? sourceRect.right : 24);
+      const clientY = Number.isFinite(event?.clientY)
+        ? event.clientY
+        : (sourceRect ? sourceRect.top : 24);
+      const maxLeft = global.innerWidth - rect.width - 12;
+      const maxTop = global.innerHeight - rect.height - 12;
+      const left = Math.max(12, Math.min(clientX + offset, maxLeft));
+      const top = Math.max(12, Math.min(clientY + offset, maxTop));
+
+      this.tooltipEl.style.left = `${left}px`;
+      this.tooltipEl.style.top = `${top}px`;
+    }
+
+    hideTooltip() {
+      if (!this.tooltipEl) return;
+
+      this.cancelTooltipHide();
+      this.tooltipEl.hidden = true;
+      this.tooltipEl.classList.remove("dm-tooltip--visible");
+      this.tooltipEl.innerHTML = "";
+    }
+
+    scheduleTooltipHide() {
+      this.cancelTooltipHide();
+      this.tooltipHideTimer = global.setTimeout(() => this.hideTooltip(), 160);
+    }
+
+    cancelTooltipHide() {
+      if (!this.tooltipHideTimer) return;
+
+      global.clearTimeout(this.tooltipHideTimer);
+      this.tooltipHideTimer = null;
+    }
+
+    renderTooltip(annotation) {
+      const title = annotation.title ? `<div class="dm-tooltip-title">${escapeHtml(annotation.title)}</div>` : "";
+      const body = annotation.body ? `<div class="dm-tooltip-body">${this.renderRichText(annotation.body)}</div>` : "";
+      const fields = annotation.fields?.length
+        ? `
+          <dl class="dm-tooltip-fields">
+            ${annotation.fields.map((field) => `
+              <div class="dm-tooltip-field">
+                <dt>${escapeHtml(field.label)}</dt>
+                <dd>${this.renderRichText(field.value)}</dd>
+              </div>
+            `).join("")}
+          </dl>
+        `
+        : "";
+      const links = annotation.links?.length
+        ? `
+          <div class="dm-tooltip-links">
+            ${annotation.links.map((link, index) => `
+              <a href="${escapeHtml(link.href)}" data-dm-tooltip-link="${index}">${escapeHtml(link.label || link.href)}</a>
+            `).join("")}
+          </div>
+        `
+        : "";
+      return `${title}${body}${fields}${links}`;
+    }
+
+    renderRichText(value) {
+      const escaped = escapeHtml(value || "");
+      return escaped
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\n/g, "<br>");
+    }
+
+    bindTooltipLinks(annotation) {
+      if (!this.tooltipEl || !annotation.links?.length) return;
+
+      this.tooltipEl.querySelectorAll("[data-dm-tooltip-link]").forEach((anchor) => {
+        const index = Number(anchor.dataset.dmTooltipLink);
+        const link = annotation.links[index];
+        if (!link?.href) return;
+
+        if (link.href.startsWith(EXT_PREFIX)) {
+          anchor.setAttribute("href", "#");
+          anchor.addEventListener("click", async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.hideTooltip();
+            await this.open(normalizeUrl(link.href.slice(EXT_PREFIX.length).trim(), this.current.src), {
+              pushHistory: true,
+            });
+          });
+          return;
+        }
+
+        anchor.setAttribute("target", "_blank");
+        anchor.setAttribute("rel", "noopener noreferrer");
+      });
     }
 
     async resetView() {
@@ -682,235 +1171,17 @@
       this.modalEl.setAttribute("aria-hidden", "true");
       document.body.classList.remove("dm-modal-open");
       if (this.modalStageEl) this.modalStageEl.innerHTML = "";
+      this.hideTooltip();
       this.resetModalZoom();
       this.expandBtn?.focus();
     }
   }
 
-  function injectDefaultStyles() {
-    if (document.getElementById("distributed-mermaid-styles")) {
-      return;
-    }
-
-    const style = document.createElement("style");
-    style.id = "distributed-mermaid-styles";
-    style.textContent = `
-      .distributed-mermaid-viewer {
-        border: 1px solid #d0d7de;
-        border-radius: 8px;
-        padding: 16px;
-        background: #fff;
-      }
-
-      .dm-toolbar {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 12px;
-        margin-bottom: 12px;
-      }
-
-      .dm-title {
-        font-weight: 700;
-        font-size: 16px;
-      }
-
-      .dm-file {
-        margin-top: 4px;
-        color: #57606a;
-        font-size: 12px;
-        word-break: break-all;
-      }
-
-      .dm-actions,
-      .dm-view-actions {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .dm-actions {
-        flex-shrink: 0;
-      }
-
-      .dm-actions button {
-        border: 1px solid #d0d7de;
-        background: #f6f8fa;
-        color: #24292f;
-        border-radius: 8px;
-        width: 36px;
-        height: 36px;
-        padding: 0;
-        text-decoration: none;
-        font-size: 14px;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .dm-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        line-height: 1;
-      }
-
-      .dm-actions button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
-      .dm-status {
-        min-height: 24px;
-        margin-bottom: 8px;
-        color: #57606a;
-      }
-
-      .dm-status--error {
-        color: #cf222e;
-      }
-
-      .dm-canvas {
-        overflow: hidden;
-        position: relative;
-        cursor: grab;
-        touch-action: none;
-        border: 1px solid #d8dee4;
-        border-radius: 8px;
-      }
-
-      .dm-canvas--dragging {
-        cursor: grabbing;
-      }
-
-      .dm-stage {
-        min-width: 100%;
-        min-height: inherit;
-        transform-origin: 0 0;
-        transition: transform 120ms ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .dm-canvas--dragging .dm-stage {
-        transition: none;
-      }
-
-      .dm-stage svg {
-        display: block;
-        max-width: none;
-        height: auto;
-        margin: 0;
-      }
-
-      body.dm-modal-open {
-        overflow: hidden;
-      }
-
-      .dm-modal {
-        display: none;
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        background: rgba(31, 35, 40, 0.65);
-        padding: 32px;
-      }
-
-      .dm-modal--open {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .dm-modal-dialog {
-        position: relative;
-        width: min(1200px, 96vw);
-        height: min(820px, 90vh);
-        overflow: hidden;
-        cursor: grab;
-        touch-action: none;
-        border: 1px solid #d0d7de;
-        border-radius: 8px;
-        background: #fff;
-        padding: 48px 24px 24px;
-      }
-
-      .dm-modal-dialog--dragging {
-        cursor: grabbing;
-      }
-
-      .dm-modal-dialog--dragging .dm-modal-stage {
-        transition: none;
-      }
-
-      .dm-modal-close {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        z-index: 1;
-        border: 1px solid #d0d7de;
-        background: #f6f8fa;
-        color: #24292f;
-        border-radius: 8px;
-        width: 36px;
-        height: 36px;
-        padding: 0;
-        font-size: 14px;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .dm-modal-stage {
-        min-width: 100%;
-        min-height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transform-origin: 0 0;
-        transition: transform 120ms ease;
-      }
-
-      .dm-modal-stage svg {
-        display: block;
-        max-width: none;
-        height: auto;
-      }
-
-      @media (max-width: 640px) {
-        .dm-modal {
-          padding: 12px;
-        }
-
-        .dm-modal-dialog {
-          width: 100%;
-          height: 92vh;
-          padding: 56px 12px 16px;
-        }
-      }
-
-      .dm-clickable,
-      .dm-clickable * {
-        cursor: pointer;
-      }
-
-      .dm-clickable rect,
-      .dm-clickable polygon,
-      .dm-clickable path {
-        stroke-width: 2px !important;
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  injectDefaultStyles();
 
   global.Flowbridge = {
     Viewer: DistributedMermaidViewer,
     loadDiagram,
   };
+
   global.DistributedMermaid = global.Flowbridge;
 })(window);
