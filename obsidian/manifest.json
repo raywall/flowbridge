@@ -1,0 +1,9 @@
+{
+  "id": "flowbridge",
+  "name": "Flowbridge",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Visualizador navegável de diagramas Mermaid distribuídos no vault.",
+  "author": "raywall",
+  "isDesktopOnly": false
+}

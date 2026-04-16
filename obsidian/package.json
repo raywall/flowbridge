@@ -1,0 +1,24 @@
+{
+  "name": "obsidian-flowbridge",
+  "version": "1.0.0",
+  "description": "Flowbridge viewer for Obsidian Mermaid diagrams.",
+  "main": "main.js",
+  "scripts": {
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "dev": "node esbuild.config.mjs"
+  },
+  "keywords": [
+    "obsidian",
+    "mermaid",
+    "flowbridge"
+  ],
+  "author": "raywall",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.2",
+    "obsidian": "^1.5.12",
+    "typescript": "^5.3.3"
+  }
+}

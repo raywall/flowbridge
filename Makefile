@@ -41,4 +41,12 @@ stop:
 	@-lsof -ti tcp:4220 | xargs kill 2>/dev/null || true
 	@echo "  Pronto."
 
-.PHONY: shared vendas estoque start stop
+# Gera o plugin flowbridge para obsidian
+build:
+	@mkdir -p dist
+	@npm --prefix obsidian install
+	@npm --prefix obsidian run build
+	@cp obsidian/manifest.json dist/manifest.json
+	@cp obsidian/styles.css dist/styles.css
+
+.PHONY: shared vendas estoque start stop build

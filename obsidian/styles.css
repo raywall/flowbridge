@@ -1,0 +1,156 @@
+.fb-viewer {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--background-primary);
+}
+
+.fb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.fb-toolbar-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.fb-btn {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.fb-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.fb-svg-wrap {
+  overflow: hidden;
+  background: var(--background-primary);
+  cursor: grab;
+}
+
+.fb-svg-wrap--dragging {
+  cursor: grabbing;
+}
+
+.fb-stage {
+  min-width: 100%;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: 0 0;
+}
+
+.fb-stage svg {
+  display: block;
+  max-width: none;
+  height: auto;
+}
+
+.fb-clickable-node,
+.fb-clickable-node * {
+  cursor: pointer;
+}
+
+.fb-annotated-node rect,
+.fb-annotated-node polygon,
+.fb-annotated-node path {
+  stroke-width: 2px !important;
+}
+
+.fb-annotated-node:hover rect,
+.fb-annotated-node:hover polygon,
+.fb-annotated-node:hover path,
+.fb-annotated-node:focus rect,
+.fb-annotated-node:focus polygon,
+.fb-annotated-node:focus path {
+  filter: drop-shadow(0 4px 8px rgba(99, 102, 241, 0.24));
+}
+
+.fb-tooltip {
+  position: fixed;
+  z-index: 9999;
+  max-width: 340px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  line-height: 1.5;
+  pointer-events: auto;
+}
+
+.fb-tooltip-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.fb-tooltip-desc {
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.fb-tooltip-alert {
+  color: var(--text-error);
+  background: var(--background-modifier-error);
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+}
+
+.fb-tooltip-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.fb-tooltip-tag {
+  background: var(--background-modifier-hover);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.fb-tooltip-meta {
+  font-size: 12px;
+}
+
+.fb-tooltip-meta-label {
+  color: var(--text-faint);
+}
+
+.fb-tooltip-links {
+  margin-top: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 8px;
+}
+
+.fb-tooltip-link {
+  display: block;
+  color: var(--link-color);
+  margin-top: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.fb-tooltip-link:hover {
+  text-decoration: underline;
+}

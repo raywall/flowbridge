@@ -46,6 +46,15 @@ flowbridge/
 │       └── styles.css
 ├── src/
 │   └── server.py
+├── obsidian/
+│   ├── src/
+│   ├── manifest.json
+│   ├── package.json
+│   └── styles.css
+├── dist/
+│   ├── main.js
+│   ├── manifest.json
+│   └── styles.css
 ├── Makefile
 └── README.md
 ```
@@ -84,6 +93,65 @@ make shared
 make vendas
 make estoque
 ```
+
+## Flowbridge para Obsidian
+
+Além do viewer para sites estáticos, o projeto também inclui uma versão do `flowbridge` como plugin para Obsidian.
+
+O código-fonte do plugin fica em `obsidian/` e o build gera a pasta `dist/` na raiz do projeto com os arquivos esperados pelo Obsidian:
+
+```txt
+dist/
+├── main.js
+├── manifest.json
+└── styles.css
+```
+
+Para compilar:
+
+```bash
+make build
+```
+
+Dentro de uma nota do Obsidian, use um bloco `flowbridge` apontando para um arquivo `.mmd` do vault:
+
+````markdown
+```flowbridge
+src: diagrams/vendas.mmd
+height: 520
+theme: default
+```
+````
+
+Também é possível escrever o Mermaid diretamente dentro do bloco. Nesse modo, `src` não é obrigatório:
+
+````markdown
+```flowbridge
+height: 520
+theme: default
+
+%% title: Fluxo de vendas
+flowchart LR
+  start([Inicio]):::start
+  receive[Receber pedido]
+  finish([Fim]):::success
+
+  start --> receive --> finish
+
+  %% @tooltip receive
+  %%   title: Receber Pedido
+  %%   description: Normaliza o payload recebido pelo canal de venda.
+  %%   owner: time-vendas
+  %% @end
+
+  classDef start fill:#dbeafe,stroke:#2563eb,color:#1e40af,font-weight:bold
+  classDef success fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
+```
+````
+
+O plugin renderiza o Mermaid no Obsidian, mantém navegação por links `ext:`, tooltips declarados com `%% @tooltip`, zoom, arraste, reset, voltar e download do `.mmd` exibido.
+
+Links `ext:` para outros arquivos do vault navegam dentro do próprio viewer. Links HTTP/HTTPS abrem em uma nova aba.
 
 ## Monitoramento com Datadog
 
