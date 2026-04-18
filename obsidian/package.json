@@ -20,5 +20,10 @@
     "esbuild": "^0.20.2",
     "obsidian": "^1.5.12",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@fortawesome/free-brands-svg-icons": "^7.2.0",
+    "@fortawesome/free-regular-svg-icons": "^7.2.0",
+    "@fortawesome/free-solid-svg-icons": "^7.2.0"
   }
 }

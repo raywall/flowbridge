@@ -108,6 +108,26 @@
   margin: 0;
 }
 
+.dm-node-icon {
+  font-weight: 700;
+}
+
+.dm-node-icon-svg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25em;
+  height: 1.25em;
+  margin-right: 6px;
+  vertical-align: -0.125em;
+}
+
+.dm-node-icon-svg svg {
+  display: block;
+  width: 1.25em;
+  height: 1.25em;
+}
+
 body.dm-modal-open {
   overflow: hidden;
 }

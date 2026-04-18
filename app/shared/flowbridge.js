@@ -30,11 +30,33 @@
     },
   };
 
+  const BUILTIN_FA_ICON_PACK = {
+    prefix: "fa",
+    icons: {
+      terminal: {
+        width: 640,
+        height: 512,
+        body: '<path fill="currentColor" d="M64 96C46.3 96 32 110.3 32 128v256c0 17.7 14.3 32 32 32h512c17.7 0 32-14.3 32-32V128c0-17.7-14.3-32-32-32H64zm64 72c9.4-9.4 24.6-9.4 33.9 0l80 80c9.4 9.4 9.4 24.6 0 33.9l-80 80c-9.4 9.4-24.6 9.4-33.9 0s-9.4-24.6 0-33.9l63-63-63-63c-9.4-9.4-9.4-24.6 0-33.9zM288 336h160c13.3 0 24 10.7 24 24s-10.7 24-24 24H288c-13.3 0-24-10.7-24-24s10.7-24 24-24z"/>',
+      },
+      "fa-terminal": {
+        parent: "terminal",
+      },
+    },
+  };
+
   function ensureMermaid(theme) {
     if (!global.mermaid) {
       throw new Error(
         "Mermaid nao encontrado. Inclua o script do Mermaid antes do plugin."
       );
+    }
+
+    if (!global.__flowbridgeMermaidIconsRegistered) {
+      global.mermaid.registerIconPacks?.([
+        { name: "fa", icons: BUILTIN_FA_ICON_PACK },
+        { name: "fas", icons: BUILTIN_FA_ICON_PACK },
+      ]);
+      global.__flowbridgeMermaidIconsRegistered = true;
     }
 
     if (!global.__distributedMermaidInitialized) {
@@ -287,9 +309,122 @@
   function cleanNodeLabel(value) {
     return String(value || "")
       .replace(/^["']|["']$/g, "")
+      .replace(/^\s*fa[a-z]*:fa-[\w-]+\s+/i, "")
       .replace(/<br\s*\/?>/gi, " ")
       .replace(/<[^>]+>/g, "")
       .trim();
+  }
+
+  function parseClassIconDirectives(content) {
+    const icons = new Map();
+    const pattern =
+      /^\s*%%\s*(?:(?:flowbridge)\s*:?\s*)?(?:classIcon|class-icon)\s+([A-Za-z][\w-]*)\s+(\S+)\s*$/i;
+
+    String(content || "")
+      .split(/\r?\n/)
+      .forEach((line) => {
+        const match = line.match(pattern);
+        if (!match) return;
+
+        icons.set(match[1], match[2]);
+      });
+
+    return icons;
+  }
+
+  function parseClassStyles(content) {
+    const styles = new Map();
+    const pattern = /^\s*classDef\s+(.+?)\s+(.+?)\s*;?\s*$/i;
+
+    String(content || "")
+      .split(/\r?\n/)
+      .forEach((line) => {
+        const match = line.match(pattern);
+        if (!match) return;
+
+        const color = match[2].match(/(?:^|[,;])\s*color\s*:\s*([^,;]+)/i)?.[1]?.trim();
+        if (!color) return;
+
+        match[1]
+          .split(",")
+          .map((className) => className.trim())
+          .filter(Boolean)
+          .forEach((className) => styles.set(className, { color }));
+      });
+
+    return styles;
+  }
+
+  function addNodeClass(nodeClasses, nodeId, className) {
+    if (!nodeClasses.has(nodeId)) {
+      nodeClasses.set(nodeId, new Set());
+    }
+
+    nodeClasses.get(nodeId).add(className);
+  }
+
+  function parseNodeClasses(content) {
+    const nodeClasses = new Map();
+    const inlineClassPattern =
+      /^\s*([A-Za-z][\w-]*)\s*(?:\(\[|\[\(|\[\[|\(\(|\[|\(|\{).+?(?:\]\)|\]\]|\)\]|\)\)|\]|\)|\})\s*:::\s*([A-Za-z][\w-]*(?:[,\s]+[A-Za-z][\w-]*)*)/;
+    const classStatementPattern = /^\s*class\s+(.+?)\s+(.+?)\s*;?\s*$/i;
+
+    String(content || "")
+      .split(/\r?\n/)
+      .forEach((line) => {
+        if (/^\s*%%/.test(line)) return;
+
+        const inline = line.match(inlineClassPattern);
+        if (inline) {
+          inline[2]
+            .split(/[,\s]+/)
+            .filter(Boolean)
+            .forEach((className) => addNodeClass(nodeClasses, inline[1], className));
+        }
+
+        const statement = line.match(classStatementPattern);
+        if (!statement) return;
+
+        const nodeIds = statement[1].split(",").map((nodeId) => nodeId.trim()).filter(Boolean);
+        const classNames = statement[2].split(/[,\s]+/).map((className) => className.trim()).filter(Boolean);
+
+        nodeIds.forEach((nodeId) => {
+          classNames.forEach((className) => addNodeClass(nodeClasses, nodeId, className));
+        });
+      });
+
+    return nodeClasses;
+  }
+
+  function hasMermaidIcon(label) {
+    return /^\s*fa[a-z]*:fa-[\w-]+(?:\s|$)/i.test(String(label || ""));
+  }
+
+  function findColorForClasses(classes, classStyles) {
+    if (!classes) return "";
+
+    for (const className of classes) {
+      const color = classStyles.get(className)?.color;
+      if (color) return color;
+    }
+
+    return "";
+  }
+
+  function findIconForClasses(classes, classIcons, classStyles) {
+    if (!classes) return null;
+
+    for (const className of classes) {
+      const icon = classIcons.get(className);
+      if (icon) {
+        return {
+          icon,
+          color: classStyles.get(className)?.color || findColorForClasses(classes, classStyles),
+        };
+      }
+    }
+
+    return null;
   }
 
   function parseNodeLabels(content) {
@@ -338,6 +473,9 @@
       links: parseExternalLinks(content, normalized),
       annotations: parseNodeAnnotations(content),
       labels: parseNodeLabels(content),
+      classIcons: parseClassIconDirectives(content),
+      classStyles: parseClassStyles(content),
+      nodeClasses: parseNodeClasses(content),
     };
 
     if (options.enableCache !== false) {
@@ -558,9 +696,232 @@
 
     decorateExternalLinks(root = this.stageEl) {
       this.removeMermaidTooltips(root);
+      this.decorateClassIcons(root);
       this.decorateHrefLinks(root);
       this.decorateNodeLinks(root);
       this.decorateNodeAnnotations(root);
+    }
+
+    decorateClassIcons(root = this.stageEl) {
+      if (!this.current?.classIcons?.size || !this.current?.nodeClasses?.size) return;
+
+      for (const [nodeId, classes] of this.current.nodeClasses.entries()) {
+        const iconConfig = findIconForClasses(classes, this.current.classIcons, this.current.classStyles);
+        if (!iconConfig) continue;
+
+        const node = this.findRenderedNode(root, nodeId);
+        if (!node) continue;
+
+        this.decorateRenderedNodeIcon(node, iconConfig.icon, this.current.labels?.get(nodeId), iconConfig.color);
+      }
+    }
+
+    decorateRenderedNodeIcon(node, icon, label = "", iconColor = "") {
+      const renderedIcon = this.resolveRenderedIcon(icon);
+      if (!renderedIcon || node.querySelector('[data-flowbridge-icon="true"]')) return;
+      const displayLabel = label || this.extractRenderedNodeLabel(node);
+
+      node.classList.add("dm-icon-node");
+      this.expandRenderedNodeForIcon(node);
+
+      const htmlLabel = this.findNodeHtmlLabelElement(node, displayLabel);
+      if (htmlLabel instanceof HTMLElement) {
+        htmlLabel.dataset.flowbridgeIcon = "true";
+        htmlLabel.classList.add("dm-node-icon");
+        this.setHtmlLabelWithIcon(
+          htmlLabel,
+          renderedIcon,
+          this.cleanRenderedLabel(htmlLabel.textContent || displayLabel),
+          iconColor
+        );
+        return;
+      }
+
+      const textEl = this.findNodeTextElement(node, displayLabel);
+      if (!textEl) return;
+
+      textEl.setAttribute("data-flowbridge-icon", "true");
+      if (iconColor && textEl instanceof SVGElement) {
+        textEl.style.fill = iconColor;
+      }
+      textEl.textContent = `${renderedIcon.fallback} ${this.cleanRenderedLabel(textEl.textContent || displayLabel)}`;
+    }
+
+    setHtmlLabelWithIcon(labelEl, icon, label, iconColor = "") {
+      labelEl.textContent = "";
+
+      if (icon.svg) {
+        const iconEl = document.createElement("span");
+        iconEl.className = "dm-node-icon-svg";
+        iconEl.setAttribute("aria-hidden", "true");
+        iconEl.innerHTML = icon.svg;
+        this.applyInlineIconColor(iconEl, iconColor);
+        labelEl.appendChild(iconEl);
+      } else {
+        labelEl.appendChild(document.createTextNode(icon.fallback));
+      }
+
+      labelEl.appendChild(document.createTextNode(` ${label}`));
+    }
+
+    applyInlineIconColor(iconEl, iconColor = "") {
+      if (!iconColor) return;
+
+      iconEl.style.color = iconColor;
+      iconEl.querySelectorAll("svg, path, polygon, circle, rect, line, polyline, ellipse").forEach((element) => {
+        if (!(element instanceof SVGElement)) return;
+
+        element.style.color = iconColor;
+
+        const fill = element.getAttribute("fill");
+        if (!fill || !/^none$/i.test(fill)) {
+          element.setAttribute("fill", "currentColor");
+          element.style.fill = "currentColor";
+        }
+
+        const stroke = element.getAttribute("stroke");
+        if (stroke && !/^none$/i.test(stroke)) {
+          element.setAttribute("stroke", "currentColor");
+          element.style.stroke = "currentColor";
+        }
+      });
+    }
+
+    findNodeHtmlLabelElement(node, label = "") {
+      const expected = normalizeText(label);
+      const candidates = Array.from(node.querySelectorAll("foreignObject p, foreignObject span, foreignObject div"))
+        .filter((candidate) => candidate instanceof HTMLElement);
+
+      if (expected) {
+        const exact = candidates.find((candidate) => normalizeText(candidate.textContent) === expected);
+        if (exact) return exact;
+      }
+
+      const leaf = candidates.find((candidate) =>
+        normalizeText(candidate.textContent) &&
+        !Array.from(candidate.children).some((child) => normalizeText(child.textContent))
+      );
+      if (leaf) return leaf;
+
+      return candidates.find((candidate) => normalizeText(candidate.textContent)) || null;
+    }
+
+    findNodeTextElement(node, label = "") {
+      const expected = normalizeText(label);
+      const candidates = Array.from(node.querySelectorAll("tspan, text"));
+
+      if (expected) {
+        const exact = candidates.find((candidate) => normalizeText(candidate.textContent) === expected);
+        if (exact) return exact;
+      }
+
+      return candidates.find((candidate) => normalizeText(candidate.textContent)) || null;
+    }
+
+    extractRenderedNodeLabel(node) {
+      const text = Array.from(node.querySelectorAll("foreignObject p, foreignObject span, foreignObject div, tspan, text"))
+        .map((candidate) => this.cleanRenderedLabel(candidate.textContent || ""))
+        .find(Boolean);
+
+      return text || "";
+    }
+
+    expandRenderedNodeForIcon(node) {
+      const extraWidth = 36;
+      const offset = extraWidth / 2;
+
+      node.querySelectorAll("foreignObject").forEach((element) => {
+        this.expandSvgNumericAttr(element, "width", extraWidth);
+        this.expandSvgNumericAttr(element, "x", -offset);
+      });
+
+      node.querySelectorAll("rect").forEach((element) => {
+        this.expandSvgNumericAttr(element, "width", extraWidth);
+        this.expandSvgNumericAttr(element, "x", -offset);
+      });
+    }
+
+    expandSvgNumericAttr(element, attr, delta) {
+      const value = Number(element.getAttribute(attr));
+      if (!Number.isFinite(value)) return;
+
+      element.setAttribute(attr, String(value + delta));
+    }
+
+    cleanRenderedLabel(value) {
+      return String(value || "")
+        .replace(/^\s*>_\s*/, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    resolveRenderedIcon(icon) {
+      const normalized = String(icon || "").trim().toLowerCase();
+
+      const directAwsSvg = this.resolveAwsIcon(normalized, true);
+      if (directAwsSvg) {
+        return {
+          svg: directAwsSvg,
+          fallback: "",
+        };
+      }
+
+      const match = normalized.match(/^(fa[a-z]*):fa-([\w-]+)$/);
+      if (!match) return null;
+
+      const prefix = match[1] === "fa" ? "fas" : match[1];
+      const iconName = match[2];
+      const faSvg = this.resolveFontAwesomeGlobalSvg(prefix, iconName);
+      if (faSvg) {
+        return {
+          svg: faSvg,
+          fallback: iconName === "terminal" ? ">_" : "",
+        };
+      }
+
+      const awsSvg = this.resolveAwsIcon(iconName);
+      if (awsSvg) {
+        return {
+          svg: awsSvg,
+          fallback: "",
+        };
+      }
+
+      if (iconName === "terminal") return { fallback: ">_" };
+
+      return null;
+    }
+
+    resolveAwsIcon(icon, requireAwsPrefix = false) {
+      const registry = global.FlowbridgeAwsIcons || null;
+      if (!registry?.icons || !registry?.aliases) return "";
+
+      const iconName = this.extractAwsIconName(icon, requireAwsPrefix);
+      if (!iconName) return "";
+
+      const slug = registry.aliases[iconName] || (registry.icons[iconName] ? iconName : "");
+      if (!slug) return "";
+
+      return registry.icons[slug] || "";
+    }
+
+    extractAwsIconName(icon, requireAwsPrefix = false) {
+      const normalized = String(icon || "").trim().toLowerCase();
+      const awsMatch = normalized.match(/^aws(?::|-)(?:fa-)?([\w-]+)$/);
+      if (awsMatch) return awsMatch[1];
+
+      if (requireAwsPrefix) return "";
+
+      return normalized.replace(/^fa-/, "");
+    }
+
+    resolveFontAwesomeGlobalSvg(prefix, iconName) {
+      const fa = global.FontAwesome || global.fontawesome || null;
+      const icon = fa?.icon;
+      if (typeof icon !== "function") return "";
+
+      const result = icon({ prefix, iconName });
+      return result?.html?.join?.("") || "";
     }
 
     removeMermaidTooltips(root = this.stageEl) {

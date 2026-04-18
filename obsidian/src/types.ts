@@ -33,4 +33,7 @@ export interface DiagramData {
   annotations: AnnotationsMap;
   labels: Map<string, string>;
   links: Map<string, string>;
+  classIcons: Map<string, string>;
+  classStyles: Map<string, { color?: string }>;
+  nodeClasses: Map<string, Set<string>>;
 }

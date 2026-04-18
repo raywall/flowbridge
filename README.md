@@ -32,6 +32,7 @@ Com `flowbridge`, cada time continua dono do seu diagrama, mas os fluxos podem s
 flowbridge/
 ├── app/
 │   ├── shared/
+│   │   ├── aws-icons.js
 │   │   ├── flowbridge.css
 │   │   └── flowbridge.js
 │   ├── vendas/
@@ -45,6 +46,7 @@ flowbridge/
 │       ├── index.html
 │       └── styles.css
 ├── src/
+│   ├── generate-aws-icons.js
 │   └── server.py
 ├── obsidian/
 │   ├── src/
@@ -252,6 +254,67 @@ O comentário `%% title: ...` é opcional, mas recomendado. O viewer usa esse va
 
 O prefixo `ext:` indica que aquele link deve ser tratado pelo `flowbridge`. Em vez de abrir outra aba ou um popup, o viewer carrega o diagrama referenciado dentro da mesma área da página.
 
+### Ícones por classe
+
+O `flowbridge` pode aplicar um ícone em todos os nodes que usam uma classe. Assim o `.mmd` fica mais limpo e você não precisa repetir o mesmo prefixo em cada step.
+
+Declare a regra em um comentário Mermaid:
+
+```mermaid
+%% flowbridge:classIcon lambda fa:fa-terminal
+
+flowchart LR
+  step_a[Step A]:::lambda
+  step_b[Step B]:::lambda
+
+  step_a --> step_b
+
+  classDef lambda fill:#ED7100,stroke:#BD5A00,color:#FFF
+```
+
+Ao renderizar, o viewer identifica os nodes com a classe `lambda` e injeta o ícone no SVG exibido.
+
+No plugin do Obsidian, os ícones são renderizados com os SVGs oficiais dos pacotes gratuitos do Font Awesome: solid (`fa:` ou `fas:`), regular (`far:`) e brands (`fab:`). No viewer web, o Flowbridge usa a instância global do Font Awesome quando ela está disponível na página.
+
+Para ícones da AWS, o Flowbridge usa um pacote local gerado a partir dos SVGs em `aws-icons/`. Isso evita depender de um serviço externo e funciona no viewer web e no plugin do Obsidian. Você pode usar o prefixo explícito `aws:` ou manter o padrão `fa:fa-*`; quando o ícone não existe no Font Awesome, o Flowbridge tenta encontrar um equivalente no pacote da AWS.
+
+Os ícones da AWS são gerados sem o fundo original do SVG. O símbolo usa `currentColor`, então ele herda a cor definida no `color` do `classDef`, enquanto o fundo do node continua sendo o `fill` do próprio `classDef`.
+
+O arquivo original não é alterado e o download continua entregando o `.mmd` como ele foi escrito.
+
+Também funciona com declaração de classe separada:
+
+```mermaid
+%% flowbridge:classIcon lambda fa:fa-terminal
+
+flowchart LR
+  step_a[Step A]
+  step_b[Step B]
+
+  class step_a,step_b lambda
+  classDef lambda fill:#ED7100,stroke:#BD5A00,color:#FFF
+```
+
+Exemplos:
+
+```mermaid
+%% flowbridge:classIcon lambda fa:fa-terminal
+%% flowbridge:classIcon vehicle fa:fa-car
+%% flowbridge:classIcon repo fab:fa-github
+%% flowbridge:classIcon note far:fa-note-sticky
+%% flowbridge:classIcon lambda fa:fa-lambda
+%% flowbridge:classIcon container fa:fa-ecs
+%% flowbridge:classIcon queue aws:sqs
+```
+
+Para atualizar o pacote local de ícones da AWS, substitua ou adicione os SVGs em `aws-icons/` e rode:
+
+```bash
+node src/generate-aws-icons.js
+```
+
+Esse comando atualiza `app/shared/aws-icons.js`, usado em páginas web, e `obsidian/src/aws-icons.generated.ts`, usado no plugin do Obsidian.
+
 ### Tooltips e anotações
 
 O `flowbridge` também lê comentários Mermaid para exibir detalhes ao passar o mouse ou focar um node.
@@ -305,6 +368,7 @@ Inclua Mermaid, Font Awesome, o CSS do `flowbridge` e o plugin:
   window.mermaid = mermaid;
 </script>
 
+<script src="https://sua-org.github.io/seu-repo/aws-icons.js"></script>
 <script src="https://sua-org.github.io/seu-repo/flowbridge.js"></script>
 ```
 

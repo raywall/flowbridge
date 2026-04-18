@@ -1,7 +1,7 @@
 %% title: Fluxo de vendas
 flowchart LR
   start([Inicio]):::start
-  receive[Receber pedido]
+  receive[Receber pedido]:::lambda
   customer[Validar cliente]
   stock[Consultar estoque]:::external
   payment[Autorizar pagamento]
@@ -34,3 +34,6 @@ flowchart LR
   classDef start fill:#dbeafe,stroke:#2563eb,color:#1e40af,font-weight:bold
   classDef success fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
   classDef external fill:#f5f3ff,stroke:#7c3aed,color:#5b21b6,stroke-dasharray:6 3,stroke-width:2px
+  classDef lambda fill:#ED7100,stroke:#BD5A00,color:#fff,font-weight:bold
+
+  %% flowbridge:classIcon lambda aws:lambda

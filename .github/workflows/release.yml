@@ -39,6 +39,7 @@ jobs:
         shell: bash
         run: |
           test -f app/shared/flowbridge.js
+          test -f app/shared/aws-icons.js
 
           mkdir -p dist/flowbridge
           cp -R app/shared/. dist/flowbridge/
@@ -52,6 +53,8 @@ jobs:
         shell: bash
         run: |
           gh release create "${{ steps.version.outputs.version }}" \
+            "app/shared/aws-icons.js#aws-icons.js" \
+            "app/shared/flowbridge.css#flowbridge.css" \
             "app/shared/flowbridge.js#flowbridge.js" \
             "flowbridge-${{ steps.version.outputs.version }}.tar.gz" \
             "flowbridge-${{ steps.version.outputs.version }}.zip" \

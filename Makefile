@@ -6,6 +6,7 @@ DD_DOGSTATSD_PORT ?= 8125
 DD_LOGS_JSON ?= 0
 DD_METRICS_ENABLED ?= 1
 DD_VERSION ?= dev
+OBSIDIAN_FOLDER=/Users/raysouz/Library/Mobile\ Documents/iCloud\~md\~obsidian/Documents/.obsidian/plugins/flowbridge
 
 DATADOG_ENV=DD_ENV=${DD_ENV} DD_AGENT_HOST=${DD_AGENT_HOST} DD_DOGSTATSD_PORT=${DD_DOGSTATSD_PORT} DD_LOGS_JSON=${DD_LOGS_JSON} DD_METRICS_ENABLED=${DD_METRICS_ENABLED} DD_VERSION=${DD_VERSION}
 
@@ -43,10 +44,14 @@ stop:
 
 # Gera o plugin flowbridge para obsidian
 build:
-	@mkdir -p dist
-	@npm --prefix obsidian install
-	@npm --prefix obsidian run build
-	@cp obsidian/manifest.json dist/manifest.json
-	@cp obsidian/styles.css dist/styles.css
+	@set -e; \
+	 mkdir -p dist ${OBSIDIAN_FOLDER}; \
+	 npm --prefix obsidian install; \
+	 npm --prefix obsidian run build; \
+	 cp obsidian/manifest.json dist/manifest.json; \
+	 cp obsidian/styles.css dist/styles.css; \
+	 cp dist/* ${OBSIDIAN_FOLDER}; \
+	 echo "  Plugin copiado para ${OBSIDIAN_FOLDER}"; \
+	 echo "  Recarregue o plugin Flowbridge no Obsidian para aplicar a nova build.";
 
 .PHONY: shared vendas estoque start stop build
