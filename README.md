@@ -400,6 +400,294 @@ Inicialize o viewer:
 </script>
 ```
 
+## Como implementar no Docusaurus
+
+O Docusaurus também pode usar o `flowbridge`, mas a integração precisa considerar dois pontos:
+
+- o build roda em Node.js, então o viewer deve ser inicializado apenas no navegador;
+- em GitHub Pages de projeto, a aplicação geralmente fica em `/<nome-do-repo>/`, então CSS, scripts e diagramas precisam respeitar o `baseUrl`.
+
+### Arquivos estáticos
+
+Copie os arquivos do `flowbridge` para a pasta `static/` do seu projeto Docusaurus:
+
+```txt
+seu-site/
+├── docusaurus.config.js
+├── static/
+│   ├── css/
+│   │   └── flowbridge.css
+│   ├── scripts/
+│   │   ├── aws-icons.js
+│   │   └── flowbridge.js
+│   └── diagrams/
+│       └── vendas.mmd
+└── src/
+    └── components/
+        └── FlowbridgeViewer/
+            └── index.js
+```
+
+No Docusaurus, tudo que fica em `static/` é publicado na raiz do site gerado. Se o site estiver em `https://org.github.io/docs/`, por exemplo, `static/css/flowbridge.css` será servido como `https://org.github.io/docs/css/flowbridge.css`.
+
+### Configuração do Docusaurus
+
+Configure `url`, `baseUrl`, `stylesheets`, `scripts` e o carregamento do Mermaid em `docusaurus.config.js`:
+
+```js
+import {themes as prismThemes} from 'prism-react-renderer';
+
+const githubRepository = process.env.GITHUB_REPOSITORY ?? '';
+const [githubOwner, githubProject] = githubRepository.split('/');
+const baseUrl = process.env.DOCUSAURUS_BASE_URL ?? '/';
+const withBaseUrl = (pathname) => `${baseUrl.replace(/\/$/, '')}/${pathname.replace(/^\//, '')}`;
+
+const config = {
+  title: 'Minha documentacao',
+  tagline: 'Fluxos funcionais conectados',
+  favicon: 'img/favicon.ico',
+
+  url: process.env.DOCUSAURUS_URL ?? (githubOwner ? `https://${githubOwner}.github.io` : 'https://example.com'),
+  baseUrl,
+
+  organizationName: process.env.DOCUSAURUS_ORGANIZATION_NAME ?? githubOwner ?? 'minha-org',
+  projectName: process.env.DOCUSAURUS_PROJECT_NAME ?? githubProject ?? 'meu-repo',
+
+  stylesheets: [
+    withBaseUrl('/css/flowbridge.css'),
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css',
+  ],
+  scripts: [
+    withBaseUrl('/scripts/aws-icons.js'),
+    withBaseUrl('/scripts/flowbridge.js'),
+  ],
+  headTags: [{
+    tagName: 'script',
+    attributes: { type: 'module' },
+    innerHTML: 'import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs"; window.mermaid = mermaid;',
+  }],
+
+  presets: [
+    [
+      'classic',
+      {
+        docs: {
+          sidebarPath: './sidebars.js',
+        },
+        theme: {
+          customCss: './src/css/custom.css',
+        },
+      },
+    ],
+  ],
+
+  themeConfig: {
+    prism: {
+      theme: prismThemes.github,
+      darkTheme: prismThemes.dracula,
+    },
+  },
+};
+
+export default config;
+```
+
+O helper `withBaseUrl` evita o erro comum de publicar em GitHub Pages e o navegador tentar buscar arquivos em `https://org.github.io/css/flowbridge.css`. Para repositórios publicados como projeto, o caminho correto precisa incluir o nome do repositório, como `https://org.github.io/meu-repo/css/flowbridge.css`.
+
+### Componente React
+
+Crie `src/components/FlowbridgeViewer/index.js`:
+
+```jsx
+import React, {useEffect, useRef} from 'react';
+import BrowserOnly from '@docusaurus/BrowserOnly';
+
+export default function FlowbridgeViewer({src, height = 520}) {
+  return (
+    <BrowserOnly fallback={<div>Carregando diagrama...</div>}>
+      {() => {
+        const Viewer = () => {
+          const containerRef = useRef(null);
+
+          useEffect(() => {
+            let isMounted = true;
+
+            async function bootstrap() {
+              while ((!window.mermaid || !window.Flowbridge) && isMounted) {
+                await new Promise((resolve) => setTimeout(resolve, 50));
+              }
+
+              if (isMounted && containerRef.current && window.Flowbridge) {
+                containerRef.current.innerHTML = '';
+
+                const viewer = new window.Flowbridge.Viewer({
+                  element: containerRef.current,
+                  initialSrc: src,
+                  height,
+                });
+
+                await viewer.start();
+              }
+            }
+
+            bootstrap();
+
+            return () => {
+              isMounted = false;
+            };
+          }, [src, height]);
+
+          return <div ref={containerRef} style={{width: '100%', minHeight: height}} />;
+        };
+
+        return <Viewer />;
+      }}
+    </BrowserOnly>
+  );
+}
+```
+
+`BrowserOnly` impede que o Docusaurus tente executar `window`, Mermaid e `Flowbridge` durante o build estático.
+
+### Usando o componente
+
+Para diagramas dentro de `static/diagrams`, use `useBaseUrl` antes de passar o caminho para o viewer:
+
+```jsx
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import FlowbridgeViewer from '@site/src/components/FlowbridgeViewer';
+
+export default function MinhaPagina() {
+  const diagramSrc = useBaseUrl('/diagrams/vendas.mmd');
+
+  return (
+    <FlowbridgeViewer
+      src={diagramSrc}
+      height={600}
+    />
+  );
+}
+```
+
+Isso faz o diagrama ser carregado de `/diagrams/vendas.mmd` em ambiente local e de `/<nome-do-repo>/diagrams/vendas.mmd` quando o site estiver em GitHub Pages.
+
+Em MDX, a ideia é a mesma:
+
+```mdx
+import useBaseUrl from '@docusaurus/useBaseUrl';
+import FlowbridgeViewer from '@site/src/components/FlowbridgeViewer';
+
+export const Diagram = () => {
+  const src = useBaseUrl('/diagrams/vendas.mmd');
+  return <FlowbridgeViewer src={src} height={600} />;
+};
+
+<Diagram />
+```
+
+### Workflow para GitHub Pages
+
+Use o deploy oficial do GitHub Pages por Actions. O exemplo abaixo considera que o projeto Docusaurus fica em `app/gitpage`:
+
+```yaml
+name: docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - app/gitpage/**
+      - .github/workflows/docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: app/gitpage
+
+jobs:
+  build:
+    name: gerar docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: baixar codigo
+        uses: actions/checkout@v4
+
+      - name: configurar node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/gitpage/package-lock.json
+
+      - name: configurar github pages
+        uses: actions/configure-pages@v5
+
+      - name: definir url do docusaurus
+        shell: bash
+        run: |
+          repository_owner="${GITHUB_REPOSITORY%/*}"
+          repository_name="${GITHUB_REPOSITORY#*/}"
+
+          if [[ "${repository_name}" == *.github.io ]]; then
+            site_url="https://${repository_name}"
+            base_url="/"
+          else
+            site_url="https://${repository_owner}.github.io"
+            base_url="/${repository_name}/"
+          fi
+
+          echo "DOCUSAURUS_URL=${site_url}" >> "$GITHUB_ENV"
+          echo "DOCUSAURUS_BASE_URL=${base_url}" >> "$GITHUB_ENV"
+          echo "DOCUSAURUS_ORGANIZATION_NAME=${repository_owner}" >> "$GITHUB_ENV"
+          echo "DOCUSAURUS_PROJECT_NAME=${repository_name}" >> "$GITHUB_ENV"
+
+      - name: instalar dependencias
+        run: npm ci
+
+      - name: gerar build
+        run: npm run build
+
+      - name: enviar artefato do pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/gitpage/build
+
+  deploy:
+    name: publicar docs
+    runs-on: ubuntu-latest
+    needs: build
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: publicar no github pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+No GitHub, configure `Settings > Pages > Build and deployment > Source` como `GitHub Actions`.
+
+Para usar `npm ci` no workflow, mantenha o `package-lock.json` do projeto Docusaurus versionado. Se o repositório tiver uma regra global ignorando `package-lock.json`, libere o lock do Docusaurus no `.gitignore`:
+
+```gitignore
+package-lock.json
+!app/gitpage/package-lock.json
+app/gitpage/build/
+```
+
 ## Opções disponíveis
 
 ```js
