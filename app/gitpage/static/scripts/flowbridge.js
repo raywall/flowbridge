@@ -24,6 +24,7 @@
     maxZoom: 4,
     zoomStep: 0.2,
     enableCache: true,
+    baseUrl: "",
     theme: "default",
     fetchOptions: {
       cache: "no-store",
@@ -77,6 +78,33 @@
     return new URL(url, base || global.location.href).toString();
   }
 
+  function normalizeBasePath(baseUrl) {
+    if (!baseUrl) return "/";
+
+    const pathname = new URL(baseUrl, global.location.origin).pathname || "/";
+    return `/${pathname.replace(/^\/+|\/+$/g, "")}/`.replace(/\/{2,}/g, "/");
+  }
+
+  function resolveFlowbridgeUrl(url, base, siteBaseUrl) {
+    const value = String(url || "").trim();
+    if (!value) return normalizeUrl(value, base);
+
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith("//")) {
+      return normalizeUrl(value, base);
+    }
+
+    if (!value.startsWith("/")) {
+      return normalizeUrl(value, base);
+    }
+
+    const basePath = normalizeBasePath(siteBaseUrl);
+    if (basePath === "/" || value === basePath || value.startsWith(basePath)) {
+      return normalizeUrl(value, global.location.origin);
+    }
+
+    return normalizeUrl(`${basePath.replace(/\/$/, "")}${value}`, global.location.origin);
+  }
+
   function escapeHtml(value) {
     return String(value)
       .replaceAll("&", "&amp;")
@@ -114,7 +142,7 @@
     return getFileName(url).replace(/\.(mmd|md|txt)$/i, "") || "Diagrama";
   }
 
-  function parseExternalLinks(content, baseUrl) {
+  function parseExternalLinks(content, baseUrl, siteBaseUrl) {
     const links = new Map();
     const pattern =
       /^\s*click\s+([^\s]+)\s+(?:"([^"]+)"|'([^']+)'|([^\s]+))(?:\s+["'][^"']*["'])?/gim;
@@ -130,7 +158,7 @@
       if (!targetUrl) continue;
 
       links.set(nodeId, {
-        src: normalizeUrl(targetUrl, baseUrl),
+        src: resolveFlowbridgeUrl(targetUrl, baseUrl, siteBaseUrl),
         title: getFileName(targetUrl),
       });
     }
@@ -459,7 +487,7 @@
   }
 
   async function loadDiagram(src, options = {}) {
-    const normalized = normalizeUrl(src);
+    const normalized = resolveFlowbridgeUrl(src, global.location.href, options.baseUrl);
 
     if (options.enableCache !== false && diagramCache.has(normalized)) {
       return diagramCache.get(normalized);
@@ -470,7 +498,7 @@
       src: normalized,
       title: extractTitle(content, normalized),
       content,
-      links: parseExternalLinks(content, normalized),
+      links: parseExternalLinks(content, normalized, options.baseUrl),
       annotations: parseNodeAnnotations(content),
       labels: parseNodeLabels(content),
       classIcons: parseClassIconDirectives(content),
@@ -500,7 +528,7 @@
 
       this.options = merged;
       this.root = merged.element;
-      this.initialSrc = normalizeUrl(merged.initialSrc);
+      this.initialSrc = resolveFlowbridgeUrl(merged.initialSrc, global.location.href, merged.baseUrl);
       this.current = null;
       this.history = [];
       this.zoom = {
@@ -946,7 +974,7 @@
           : linkedSrc;
 
         const target = {
-          src: normalizeUrl(targetSrc, this.current.src),
+          src: resolveFlowbridgeUrl(targetSrc, this.current.src, this.options.baseUrl),
           title: getFileName(targetSrc),
         };
 
@@ -1233,7 +1261,7 @@
             event.preventDefault();
             event.stopPropagation();
             this.hideTooltip();
-            await this.open(normalizeUrl(link.href.slice(EXT_PREFIX.length).trim(), this.current.src), {
+            await this.open(resolveFlowbridgeUrl(link.href.slice(EXT_PREFIX.length).trim(), this.current.src, this.options.baseUrl), {
               pushHistory: true,
             });
           });

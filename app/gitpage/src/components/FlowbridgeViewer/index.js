@@ -1,7 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import BrowserOnly from '@docusaurus/BrowserOnly';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 export default function FlowbridgeViewer({ src, height = 520 }) {
+  const baseUrl = useBaseUrl('/');
+
   return (
     <BrowserOnly fallback={<div>Carregando diagrama...</div>}>
       {() => {
@@ -24,6 +27,7 @@ export default function FlowbridgeViewer({ src, height = 520 }) {
                 const viewer = new window.Flowbridge.Viewer({
                   element: containerRef.current,
                   initialSrc: src,
+                  baseUrl,
                   height: height,
                 });
                 
@@ -36,7 +40,7 @@ export default function FlowbridgeViewer({ src, height = 520 }) {
             return () => {
               isMounted = false; // Cleanup ao desmontar a página
             };
-          }, [src, height]);
+          }, [src, baseUrl, height]);
 
           return (
             <div 

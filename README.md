@@ -501,8 +501,11 @@ Crie `src/components/FlowbridgeViewer/index.js`:
 ```jsx
 import React, {useEffect, useRef} from 'react';
 import BrowserOnly from '@docusaurus/BrowserOnly';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 export default function FlowbridgeViewer({src, height = 520}) {
+  const baseUrl = useBaseUrl('/');
+
   return (
     <BrowserOnly fallback={<div>Carregando diagrama...</div>}>
       {() => {
@@ -523,6 +526,7 @@ export default function FlowbridgeViewer({src, height = 520}) {
                 const viewer = new window.Flowbridge.Viewer({
                   element: containerRef.current,
                   initialSrc: src,
+                  baseUrl,
                   height,
                 });
 
@@ -535,7 +539,7 @@ export default function FlowbridgeViewer({src, height = 520}) {
             return () => {
               isMounted = false;
             };
-          }, [src, height]);
+          }, [src, baseUrl, height]);
 
           return <div ref={containerRef} style={{width: '100%', minHeight: height}} />;
         };
@@ -570,6 +574,14 @@ export default function MinhaPagina() {
 ```
 
 Isso faz o diagrama ser carregado de `/diagrams/vendas.mmd` em ambiente local e de `/<nome-do-repo>/diagrams/vendas.mmd` quando o site estiver em GitHub Pages.
+
+Dentro dos arquivos `.mmd`, prefira links sem o nome do repositório:
+
+```mermaid
+click stock "ext:/diagrams/estoque.mmd" "Abrir fluxo de estoque"
+```
+
+Com `baseUrl` passado para o `Flowbridge.Viewer`, esse link resolve como `/diagrams/estoque.mmd` no Docusaurus local e como `/<nome-do-repo>/diagrams/estoque.mmd` no GitHub Pages. Evite gravar `ext:/meu-repo/diagrams/...` no Mermaid, porque isso quebra o ambiente local.
 
 Em MDX, a ideia é a mesma:
 
@@ -695,6 +707,7 @@ const viewer = new window.Flowbridge.Viewer({
   element: document.getElementById("viewer"),
   initialSrc: "http://localhost:4210/diagrams/vendas.mmd",
   height: 520,
+  baseUrl: "/",
 
   showToolbar: true,
   showViewControls: true,
