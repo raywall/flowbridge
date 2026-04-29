@@ -1,0 +1,39 @@
+%% title: Fluxo de vendas
+flowchart LR
+  start([Inicio]):::start
+  receive[Receber pedido]:::lambda
+  customer[Validar cliente]
+  stock[Consultar estoque]:::external
+  payment[Autorizar pagamento]
+  invoice[Emitir nota fiscal]
+  finish([Fim]):::success
+
+  start --> receive --> customer --> stock --> payment --> invoice --> finish
+
+  click stock "ext:http://localhost:4220/diagrams/estoque.mmd" "Abrir fluxo de estoque"
+
+  %% @tooltip receive
+  %%   title: Receber Pedido
+  %%   description: Normaliza o payload recebido pelo canal de venda e cria a referencia inicial do fluxo.
+  %%   owner: time-vendas
+  %%   sla: < 200ms
+  %%   since: 2024-01
+  %%   tags: entrada, critico
+  %% @end
+
+  %% @tooltip stock
+  %%   title: Consultar Estoque
+  %%   description: Chamada sincrona para o fluxo funcional de estoque.
+  %%   owner: time-estoque
+  %%   sla: p99 < 500ms
+  %%   alert: Conferir fallback de cache em horario de pico.
+  %%   tags: externo, dependencia
+  %%   link: Diagrama de estoque | ext:http://localhost:4220/diagrams/estoque.mmd
+  %% @end
+
+  classDef start fill:#dbeafe,stroke:#2563eb,color:#1e40af,font-weight:bold
+  classDef success fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
+  classDef external fill:#f5f3ff,stroke:#7c3aed,color:#5b21b6,stroke-dasharray:6 3,stroke-width:2px
+  classDef lambda fill:#ED7100,stroke:#BD5A00,color:#fff,font-weight:bold
+
+  %% flowbridge:classIcon lambda aws:lambda

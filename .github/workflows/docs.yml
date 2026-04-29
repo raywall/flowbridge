@@ -1,0 +1,86 @@
+name: docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - app/gitpage/**
+      - .github/workflows/docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: app/gitpage
+
+jobs:
+  build:
+    name: gerar docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: baixar codigo
+        uses: actions/checkout@v4
+
+      - name: configurar node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/gitpage/package-lock.json
+
+      - name: configurar github pages
+        uses: actions/configure-pages@v5
+
+      - name: definir url do docusaurus
+        shell: bash
+        run: |
+          repository_owner="${GITHUB_REPOSITORY%/*}"
+          repository_name="${GITHUB_REPOSITORY#*/}"
+
+          if [[ "${repository_name}" == *.github.io ]]; then
+            site_url="https://${repository_name}"
+            base_url="/"
+          else
+            site_url="https://${repository_owner}.github.io"
+            base_url="/${repository_name}/"
+          fi
+
+          echo "DOCUSAURUS_URL=${site_url}" >> "$GITHUB_ENV"
+          echo "DOCUSAURUS_BASE_URL=${base_url}" >> "$GITHUB_ENV"
+          echo "DOCUSAURUS_ORGANIZATION_NAME=${repository_owner}" >> "$GITHUB_ENV"
+          echo "DOCUSAURUS_PROJECT_NAME=${repository_name}" >> "$GITHUB_ENV"
+
+      - name: instalar dependencias
+        run: npm ci
+
+      - name: gerar build
+        run: npm run build
+
+      - name: enviar artefato do pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/gitpage/build
+
+  deploy:
+    name: publicar docs
+    runs-on: ubuntu-latest
+    needs: build
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: publicar no github pages
+        id: deployment
+        uses: actions/deploy-pages@v4
