@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 import styles from './styles.module.css';
 import FlowbridgeViewer from '@site/src/components/FlowbridgeViewer';
 
@@ -51,12 +52,14 @@ function Feature({Svg, title, description}) {
 }
 
 export default function HomepageFeatures() {
+  const diagramSrc = useBaseUrl('/diagrams/vendas.mmd');
+
   return (
     <section className={styles.features}>
       <div className="container">
         <div className="row">
           <FlowbridgeViewer 
-            src="/diagrams/vendas.mmd" 
+            src={diagramSrc}
             height={600} 
           />
         </div>

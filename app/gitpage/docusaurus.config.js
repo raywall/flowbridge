@@ -10,6 +10,8 @@ import {themes as prismThemes} from 'prism-react-renderer';
 
 const githubRepository = process.env.GITHUB_REPOSITORY ?? '';
 const [githubOwner, githubProject] = githubRepository.split('/');
+const baseUrl = process.env.DOCUSAURUS_BASE_URL ?? '/';
+const withBaseUrl = (pathname) => `${baseUrl.replace(/\/$/, '')}/${pathname.replace(/^\//, '')}`;
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -26,7 +28,7 @@ const config = {
   url: process.env.DOCUSAURUS_URL ?? (githubOwner ? `https://${githubOwner}.github.io` : 'https://your-docusaurus-site.example.com'),
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: process.env.DOCUSAURUS_BASE_URL ?? '/',
+  baseUrl,
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -44,8 +46,8 @@ const config = {
   },
 
   // Flowbridge configuration
-  stylesheets: ['/css/flowbridge.css', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css'],
-  scripts: ['/scripts/aws-icons.js', '/scripts/flowbridge.js'],
+  stylesheets: [withBaseUrl('/css/flowbridge.css'), 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css'],
+  scripts: [withBaseUrl('/scripts/aws-icons.js'), withBaseUrl('/scripts/flowbridge.js')],
   headTags: [{
     tagName: 'script',
     attributes: { type: 'module' },
