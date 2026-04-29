@@ -10,7 +10,7 @@ flowchart LR
 
   start --> receive --> customer --> stock --> payment --> invoice --> finish
 
-  click stock "ext:http://localhost:4220/diagrams/estoque.mmd" "Abrir fluxo de estoque"
+  click stock "ext:/diagrams/estoque.mmd" "Abrir fluxo de estoque"
 
   %% @tooltip receive
   %%   title: Receber Pedido
@@ -28,7 +28,7 @@ flowchart LR
   %%   sla: p99 < 500ms
   %%   alert: Conferir fallback de cache em horario de pico.
   %%   tags: externo, dependencia
-  %%   link: Diagrama de estoque | ext:http://localhost:4220/diagrams/estoque.mmd
+  %%   link: Diagrama de estoque | ext:/diagrams/estoque.mmd
   %% @end
 
   classDef start fill:#dbeafe,stroke:#2563eb,color:#1e40af,font-weight:bold

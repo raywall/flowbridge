@@ -1,0 +1,35 @@
+%% title: Fluxo de estoque
+flowchart LR
+  start([Inicio]):::start
+  request[Receber consulta de disponibilidade]
+  locate[Localizar produto]
+  reserve[Reservar item]
+  update[Atualizar saldo]
+  sales[Retornar para vendas]:::external
+  finish([Fim]):::success
+
+  start --> request --> locate --> reserve --> update --> sales --> finish
+
+  click sales "ext:/diagrams/vendas.mmd" "Abrir fluxo de vendas"
+
+  %% @tooltip locate
+  %%   title: Localizar Produto
+  %%   description: Busca o item no catalogo operacional antes da tentativa de reserva.
+  %%   owner: time-estoque
+  %%   sla: p95 < 300ms
+  %%   tags: catalogo, leitura
+  %% @end
+
+  %% @tooltip reserve
+  %%   title: Reserva de Item
+  %%   description: Garante isolamento da reserva antes da atualizacao do saldo.
+  %%   owner: time-estoque
+  %%   sla: p99 < 700ms
+  %%   alert: Em caso de indisponibilidade, o fluxo retorna falha para vendas.
+  %%   tags: reserva, consistencia
+  %%   link: Fluxo de vendas | ext:/diagrams/vendas.mmd
+  %% @end
+
+  classDef start fill:#dbeafe,stroke:#2563eb,color:#1e40af,font-weight:bold
+  classDef success fill:#dcfce7,stroke:#16a34a,color:#166534,font-weight:bold
+  classDef external fill:#f5f3ff,stroke:#7c3aed,color:#5b21b6,stroke-dasharray:6 3,stroke-width:2px
