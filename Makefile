@@ -54,4 +54,8 @@ build:
 	 echo "  Plugin copiado para ${OBSIDIAN_FOLDER}"; \
 	 echo "  Recarregue o plugin Flowbridge no Obsidian para aplicar a nova build.";
 
-.PHONY: shared vendas estoque start stop build
+gitpage:
+	@cd app/gitpage; \
+	 npm start
+
+.PHONY: shared vendas estoque start stop build gitpage

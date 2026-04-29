@@ -1,12 +1,11 @@
 name: docs
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - app/gitpage/**
-      - .github/workflows/docs.yml
+  workflow_run:
+    workflows:
+      - release
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -26,10 +25,13 @@ jobs:
   build:
     name: gerar docs
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: baixar codigo
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: configurar node
         uses: actions/setup-node@v4
@@ -42,6 +44,8 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: definir url do docusaurus
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           repository_owner="${GITHUB_REPOSITORY%/*}"
@@ -59,6 +63,14 @@ jobs:
           echo "DOCUSAURUS_BASE_URL=${base_url}" >> "$GITHUB_ENV"
           echo "DOCUSAURUS_ORGANIZATION_NAME=${repository_owner}" >> "$GITHUB_ENV"
           echo "DOCUSAURUS_PROJECT_NAME=${repository_name}" >> "$GITHUB_ENV"
+
+          if latest_release_tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null)"; then
+            flowbridge_ref="${latest_release_tag}"
+          else
+            flowbridge_ref="${GITHUB_SHA}"
+          fi
+
+          echo "FLOWBRIDGE_RELEASE_BASE_URL=https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${flowbridge_ref}/app/shared" >> "$GITHUB_ENV"
 
       - name: instalar dependencias
         run: npm ci

@@ -40,6 +40,7 @@ jobs:
         run: |
           test -f app/shared/flowbridge.js
           test -f app/shared/aws-icons.js
+          test -f app/shared/flowbridge.css
 
           mkdir -p dist/flowbridge
           cp -R app/shared/. dist/flowbridge/
@@ -59,4 +60,4 @@ jobs:
             "flowbridge-${{ steps.version.outputs.version }}.tar.gz" \
             "flowbridge-${{ steps.version.outputs.version }}.zip" \
             --title "flowbridge ${{ steps.version.outputs.version }}" \
-            --notes "Release gerada a partir da branch main contendo apenas os arquivos de app/shared."
+            --notes "Release gerada a partir da branch main contendo os arquivos compartilhados de app/shared para uso em HTML puro, Docusaurus e GitHub Pages."

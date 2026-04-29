@@ -405,21 +405,17 @@ Inicialize o viewer:
 O Docusaurus também pode usar o `flowbridge`, mas a integração precisa considerar dois pontos:
 
 - o build roda em Node.js, então o viewer deve ser inicializado apenas no navegador;
-- em GitHub Pages de projeto, a aplicação geralmente fica em `/<nome-do-repo>/`, então CSS, scripts e diagramas precisam respeitar o `baseUrl`.
+- em GitHub Pages de projeto, a aplicação geralmente fica em `/<nome-do-repo>/`, então os diagramas precisam respeitar o `baseUrl`;
+- o runtime do `flowbridge` deve vir dos assets da release, mantendo um único `flowbridge.js`, `aws-icons.js` e `flowbridge.css` para HTML puro, Docusaurus e GitHub Pages.
 
 ### Arquivos estáticos
 
-Copie os arquivos do `flowbridge` para a pasta `static/` do seu projeto Docusaurus:
+No Docusaurus, publique apenas os arquivos próprios da documentação, como os diagramas `.mmd`. Os assets do `flowbridge` devem ser carregados da última release do repositório:
 
 ```txt
 seu-site/
 ├── docusaurus.config.js
 ├── static/
-│   ├── css/
-│   │   └── flowbridge.css
-│   ├── scripts/
-│   │   ├── aws-icons.js
-│   │   └── flowbridge.js
 │   └── diagrams/
 │       └── vendas.mmd
 └── src/
@@ -428,11 +424,11 @@ seu-site/
             └── index.js
 ```
 
-No Docusaurus, tudo que fica em `static/` é publicado na raiz do site gerado. Se o site estiver em `https://org.github.io/docs/`, por exemplo, `static/css/flowbridge.css` será servido como `https://org.github.io/docs/css/flowbridge.css`.
+No Docusaurus, tudo que fica em `static/` é publicado na raiz do site gerado. Se o site estiver em `https://org.github.io/docs/`, por exemplo, `static/diagrams/vendas.mmd` será servido como `https://org.github.io/docs/diagrams/vendas.mmd`.
 
 ### Configuração do Docusaurus
 
-Configure `url`, `baseUrl`, `stylesheets`, `scripts` e o carregamento do Mermaid em `docusaurus.config.js`:
+Configure `url`, `baseUrl`, `stylesheets`, `scripts` e o carregamento do Mermaid em `docusaurus.config.js`. O exemplo abaixo usa a última release publicada no GitHub:
 
 ```js
 import {themes as prismThemes} from 'prism-react-renderer';
@@ -440,7 +436,11 @@ import {themes as prismThemes} from 'prism-react-renderer';
 const githubRepository = process.env.GITHUB_REPOSITORY ?? '';
 const [githubOwner, githubProject] = githubRepository.split('/');
 const baseUrl = process.env.DOCUSAURUS_BASE_URL ?? '/';
-const withBaseUrl = (pathname) => `${baseUrl.replace(/\/$/, '')}/${pathname.replace(/^\//, '')}`;
+const flowbridgeReleaseBaseUrl =
+  process.env.FLOWBRIDGE_RELEASE_BASE_URL ??
+  (githubOwner && githubProject
+    ? `https://cdn.jsdelivr.net/gh/${githubOwner}/${githubProject}@latest/app/shared`
+    : 'https://cdn.jsdelivr.net/gh/raywall/flowbridge@latest/app/shared');
 
 const config = {
   title: 'Minha documentacao',
@@ -454,12 +454,12 @@ const config = {
   projectName: process.env.DOCUSAURUS_PROJECT_NAME ?? githubProject ?? 'meu-repo',
 
   stylesheets: [
-    withBaseUrl('/css/flowbridge.css'),
+    `${flowbridgeReleaseBaseUrl}/flowbridge.css`,
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css',
   ],
   scripts: [
-    withBaseUrl('/scripts/aws-icons.js'),
-    withBaseUrl('/scripts/flowbridge.js'),
+    `${flowbridgeReleaseBaseUrl}/aws-icons.js`,
+    `${flowbridgeReleaseBaseUrl}/flowbridge.js`,
   ],
   headTags: [{
     tagName: 'script',
@@ -492,7 +492,7 @@ const config = {
 export default config;
 ```
 
-O helper `withBaseUrl` evita o erro comum de publicar em GitHub Pages e o navegador tentar buscar arquivos em `https://org.github.io/css/flowbridge.css`. Para repositórios publicados como projeto, o caminho correto precisa incluir o nome do repositório, como `https://org.github.io/meu-repo/css/flowbridge.css`.
+Se quiser fixar uma versão específica em vez de usar `latest`, defina `FLOWBRIDGE_RELEASE_BASE_URL` apontando para `https://cdn.jsdelivr.net/gh/<org>/<repo>@<tag>/app/shared`. O importante é que Docusaurus e páginas HTML consumam os mesmos arquivos publicados a partir de `app/shared`.
 
 ### Componente React
 
@@ -605,12 +605,11 @@ Use o deploy oficial do GitHub Pages por Actions. O exemplo abaixo considera que
 name: docs
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - app/gitpage/**
-      - .github/workflows/docs.yml
+  workflow_run:
+    workflows:
+      - release
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -630,10 +629,13 @@ jobs:
   build:
     name: gerar docs
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: baixar codigo
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - name: configurar node
         uses: actions/setup-node@v4
@@ -646,6 +648,8 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: definir url do docusaurus
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           repository_owner="${GITHUB_REPOSITORY%/*}"
@@ -663,6 +667,14 @@ jobs:
           echo "DOCUSAURUS_BASE_URL=${base_url}" >> "$GITHUB_ENV"
           echo "DOCUSAURUS_ORGANIZATION_NAME=${repository_owner}" >> "$GITHUB_ENV"
           echo "DOCUSAURUS_PROJECT_NAME=${repository_name}" >> "$GITHUB_ENV"
+
+          if latest_release_tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null)"; then
+            flowbridge_ref="${latest_release_tag}"
+          else
+            flowbridge_ref="${GITHUB_SHA}"
+          fi
+
+          echo "FLOWBRIDGE_RELEASE_BASE_URL=https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${flowbridge_ref}/app/shared" >> "$GITHUB_ENV"
 
       - name: instalar dependencias
         run: npm ci

@@ -11,7 +11,11 @@ import {themes as prismThemes} from 'prism-react-renderer';
 const githubRepository = process.env.GITHUB_REPOSITORY ?? '';
 const [githubOwner, githubProject] = githubRepository.split('/');
 const baseUrl = process.env.DOCUSAURUS_BASE_URL ?? '/';
-const withBaseUrl = (pathname) => `${baseUrl.replace(/\/$/, '')}/${pathname.replace(/^\//, '')}`;
+const flowbridgeReleaseBaseUrl =
+  process.env.FLOWBRIDGE_RELEASE_BASE_URL ??
+  (githubOwner && githubProject
+    ? `https://cdn.jsdelivr.net/gh/${githubOwner}/${githubProject}@latest/app/shared`
+    : 'https://cdn.jsdelivr.net/gh/raywall/flowbridge@latest/app/shared');
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -46,8 +50,8 @@ const config = {
   },
 
   // Flowbridge configuration
-  stylesheets: [withBaseUrl('/css/flowbridge.css'), 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css'],
-  scripts: [withBaseUrl('/scripts/aws-icons.js'), withBaseUrl('/scripts/flowbridge.js')],
+  stylesheets: [`${flowbridgeReleaseBaseUrl}/flowbridge.css`, 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css'],
+  scripts: [`${flowbridgeReleaseBaseUrl}/aws-icons.js`, `${flowbridgeReleaseBaseUrl}/flowbridge.js`],
   headTags: [{
     tagName: 'script',
     attributes: { type: 'module' },
