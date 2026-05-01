@@ -5,3 +5,4 @@ package-lock.json
 app/gitpage/build/
 sample.mmd
 teste.html
+.nojekyll

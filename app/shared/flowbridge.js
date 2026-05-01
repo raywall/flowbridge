@@ -808,7 +808,7 @@
         }
 
         const stroke = element.getAttribute("stroke");
-        if (stroke && !/^(none|transparent)$/i.test(stroke)) {
+        if (!stroke || !/^(none|transparent)$/i.test(stroke)) {
           element.setAttribute("stroke", iconColor);
           element.style.setProperty("stroke", iconColor, "important");
         }

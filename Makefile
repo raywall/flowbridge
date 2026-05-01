@@ -23,7 +23,13 @@ estoque:
 	@${DATADOG_ENV} DD_SERVICE=flowbridge-estoque python3 ${SOURCEDIR}/server.py 4220 ${BASEDIR}/estoque
 
 studio:
-	@${DATADOG_ENV} DD_SERVICE=flowbridge-studio python3 ${SOURCEDIR}/server.py 4230 ./studio
+	@echo ""
+	@echo "  Iniciando Shared.            em http://localhost:4200"
+	@echo "  Iniciando Studio.            em http://localhost:4230"
+	@echo ""
+	@${DATADOG_ENV} DD_SERVICE=flowbridge-shared python3 ${SOURCEDIR}/server.py 4200 ${BASEDIR}/shared & \
+	 ${DATADOG_ENV} DD_SERVICE=flowbridge-studio python3 ${SOURCEDIR}/server.py 4230 ./studio & \
+	 wait;
 
 # Inicia os dois sites em paralelo (dois processos em background)
 start:

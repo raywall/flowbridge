@@ -180,12 +180,20 @@ flowchart LR
 
   async function getFlowbridgeAssetBase() {
     const params = new URLSearchParams(window.location.search);
+    const explicitBase = params.get("flowbridgeBase");
     const requestedRef = params.get("flowbridgeRef");
     const repo = params.get("flowbridgeRepo") || "raywall/flowbridge";
+
+    if (explicitBase) {
+      return explicitBase.replace(/\/+$/, "");
+    }
 
     if (requestedRef) {
       return `https://cdn.jsdelivr.net/gh/${repo}@${requestedRef}/app/shared`;
     }
+
+    const localBase = await getLocalFlowbridgeAssetBase();
+    if (localBase) return localBase;
 
     try {
       const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
@@ -205,6 +213,20 @@ flowchart LR
     }
 
     return `https://cdn.jsdelivr.net/gh/${repo}@latest/app/shared`;
+  }
+
+  async function getLocalFlowbridgeAssetBase() {
+    const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+    if (!isLocalhost) return "";
+
+    const localBase = "http://127.0.0.1:4200";
+    try {
+      await fetch(`${localBase}/flowbridge.js`, { method: "HEAD", cache: "no-store" });
+      return localBase;
+    } catch (error) {
+      console.warn("Flowbridge shared local nao esta disponivel em http://127.0.0.1:4200.", error);
+      return "";
+    }
   }
 
   function waitForMermaid() {
@@ -572,8 +594,7 @@ flowchart LR
     const iconColors = getClassIconColors(source);
     if (!iconColors.size) return;
 
-    const renderedIcons = Array.from(els.viewer.querySelectorAll(".dm-node-icon-svg, .fb-node-icon-svg"))
-      .filter((iconEl) => iconEl instanceof HTMLElement);
+    const renderedIcons = findRenderedIconElements();
     const uniqueColors = [...new Set(iconColors.values())];
 
     if (uniqueColors.length === 1) {
@@ -587,11 +608,34 @@ flowchart LR
       if (!color) continue;
 
       const node = findRenderedNode(nodeId);
-      const iconEl = node?.querySelector(".dm-node-icon-svg, .fb-node-icon-svg");
-      if (iconEl instanceof HTMLElement) {
+      const iconEl = node ? findRenderedIconElements(node)[0] : null;
+      if (iconEl) {
         forceInlineIconColor(iconEl, color);
       }
     }
+  }
+
+  function findRenderedIconElements(root = els.viewer) {
+    const icons = new Set();
+    const selectors = [
+      ".dm-node-icon-svg",
+      ".fb-node-icon-svg",
+      "svg[viewBox='0 0 80 80']",
+      "svg[viewBox='0 0 80 80'] *[id*='aws-']",
+      "*[id*='aws-']",
+      "foreignObject svg[viewBox='0 0 80 80']",
+      "foreignObject svg[viewBox='0 0 80 80'] *[id*='aws-']",
+      "foreignObject *[id*='aws-']",
+    ];
+
+    root.querySelectorAll(selectors.join(",")).forEach((element) => {
+      const iconRoot = element.closest?.(".dm-node-icon-svg, .fb-node-icon-svg, svg") || element;
+      if (iconRoot instanceof Element) {
+        icons.add(iconRoot);
+      }
+    });
+
+    return [...icons];
   }
 
   function getClassIconColors(source) {
@@ -719,7 +763,7 @@ flowchart LR
 
   function forceInlineIconColor(iconEl, color) {
     iconEl.style.setProperty("color", color, "important");
-    iconEl.querySelectorAll("svg, svg *").forEach((element) => {
+    [iconEl, ...iconEl.querySelectorAll("svg, svg *")].forEach((element) => {
       if (!(element instanceof SVGElement)) return;
 
       element.style.setProperty("color", color, "important");
@@ -731,7 +775,7 @@ flowchart LR
       }
 
       const stroke = element.getAttribute("stroke");
-      if (stroke && !/^(none|transparent)$/i.test(stroke)) {
+      if (!stroke || !/^(none|transparent)$/i.test(stroke)) {
         element.setAttribute("stroke", color);
         element.style.setProperty("stroke", color, "important");
       }
