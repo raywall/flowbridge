@@ -796,21 +796,21 @@
       if (!iconColor) return;
 
       iconEl.style.color = iconColor;
-      iconEl.querySelectorAll("svg, path, polygon, circle, rect, line, polyline, ellipse").forEach((element) => {
+      iconEl.querySelectorAll("svg, g, path, polygon, circle, rect, line, polyline, ellipse").forEach((element) => {
         if (!(element instanceof SVGElement)) return;
 
         element.style.color = iconColor;
 
         const fill = element.getAttribute("fill");
-        if (!fill || !/^none$/i.test(fill)) {
-          element.setAttribute("fill", "currentColor");
-          element.style.fill = "currentColor";
+        if (!fill || !/^(none|transparent)$/i.test(fill)) {
+          element.setAttribute("fill", iconColor);
+          element.style.setProperty("fill", iconColor, "important");
         }
 
         const stroke = element.getAttribute("stroke");
-        if (stroke && !/^none$/i.test(stroke)) {
-          element.setAttribute("stroke", "currentColor");
-          element.style.stroke = "currentColor";
+        if (stroke && !/^(none|transparent)$/i.test(stroke)) {
+          element.setAttribute("stroke", iconColor);
+          element.style.setProperty("stroke", iconColor, "important");
         }
       });
     }

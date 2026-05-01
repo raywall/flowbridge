@@ -307,7 +307,12 @@ flowchart LR
 
       await viewer.start();
       if (version === renderVersion) {
-        window.setTimeout(updateExportAvailability, 80);
+        applyStudioIconColors(source);
+        window.setTimeout(() => {
+          applyStudioIconColors(source);
+          updateExportAvailability();
+        }, 80);
+        window.setTimeout(() => applyStudioIconColors(source), 250);
       }
     } finally {
       if (oldObjectUrl) {
@@ -561,6 +566,181 @@ flowchart LR
     els.lint.classList.toggle("is-valid", state === "valid");
     els.lint.classList.toggle("is-error", state === "error");
     els.lint.textContent = message;
+  }
+
+  function applyStudioIconColors(source) {
+    const iconColors = getClassIconColors(source);
+    if (!iconColors.size) return;
+
+    const renderedIcons = Array.from(els.viewer.querySelectorAll(".dm-node-icon-svg, .fb-node-icon-svg"))
+      .filter((iconEl) => iconEl instanceof HTMLElement);
+    const uniqueColors = [...new Set(iconColors.values())];
+
+    if (uniqueColors.length === 1) {
+      renderedIcons.forEach((iconEl) => forceInlineIconColor(iconEl, uniqueColors[0]));
+      return;
+    }
+
+    const nodeClasses = parseNodeClasses(source);
+    for (const [nodeId, classes] of nodeClasses.entries()) {
+      const color = findIconColorForClasses(classes, iconColors);
+      if (!color) continue;
+
+      const node = findRenderedNode(nodeId);
+      const iconEl = node?.querySelector(".dm-node-icon-svg, .fb-node-icon-svg");
+      if (iconEl instanceof HTMLElement) {
+        forceInlineIconColor(iconEl, color);
+      }
+    }
+  }
+
+  function getClassIconColors(source) {
+    const classIcons = parseClassIconDirectives(source);
+    const classStyles = parseClassStyles(source);
+    const iconColors = new Map();
+
+    for (const className of classIcons.keys()) {
+      const color = classStyles.get(className) || findColorForClasses([className], classStyles);
+      if (color) {
+        iconColors.set(className, color);
+      }
+    }
+
+    return iconColors;
+  }
+
+  function parseClassIconDirectives(source) {
+    const icons = new Map();
+    const pattern = /^\s*%%\s*(?:(?:flowbridge)\s*:?\s*)?(?:classIcon|class-icon)\s+([A-Za-z][\w-]*)\s+(\S+)\s*$/i;
+
+    String(source || "").split(/\r?\n/).forEach((line) => {
+      const match = line.match(pattern);
+      if (match) {
+        icons.set(match[1], match[2]);
+      }
+    });
+
+    return icons;
+  }
+
+  function parseClassStyles(source) {
+    const styles = new Map();
+    const pattern = /^\s*classDef\s+(.+?)\s+(.+?)\s*;?\s*$/i;
+
+    String(source || "").split(/\r?\n/).forEach((line) => {
+      const match = line.match(pattern);
+      if (!match) return;
+
+      const color = match[2].match(/(?:^|[,;])\s*color\s*:\s*([^,;]+)/i)?.[1]?.trim();
+      if (!color) return;
+
+      match[1]
+        .split(",")
+        .map((className) => className.trim())
+        .filter(Boolean)
+        .forEach((className) => styles.set(className, color));
+    });
+
+    return styles;
+  }
+
+  function parseNodeClasses(source) {
+    const nodeClasses = new Map();
+    const inlineClassPattern = /^\s*([A-Za-z][\w-]*)\s*(?:\(\[|\[\(|\[\[|\(\(|\[|\(|\{).+?(?:\]\)|\]\]|\)\]|\)\)|\]|\)|\})\s*:::\s*([A-Za-z][\w-]*(?:[,\s]+[A-Za-z][\w-]*)*)/;
+    const classStatementPattern = /^\s*class\s+(.+?)\s+(.+?)\s*;?\s*$/i;
+
+    String(source || "").split(/\r?\n/).forEach((line) => {
+      if (/^\s*%%/.test(line)) return;
+
+      const inline = line.match(inlineClassPattern);
+      if (inline) {
+        inline[2].split(/[,\s]+/).filter(Boolean).forEach((className) => {
+          addNodeClass(nodeClasses, inline[1], className);
+        });
+      }
+
+      const statement = line.match(classStatementPattern);
+      if (!statement) return;
+
+      const nodeIds = statement[1].split(",").map((nodeId) => nodeId.trim()).filter(Boolean);
+      const classNames = statement[2].split(/[,\s]+/).map((className) => className.trim()).filter(Boolean);
+
+      nodeIds.forEach((nodeId) => {
+        classNames.forEach((className) => addNodeClass(nodeClasses, nodeId, className));
+      });
+    });
+
+    return nodeClasses;
+  }
+
+  function addNodeClass(nodeClasses, nodeId, className) {
+    if (!nodeClasses.has(nodeId)) {
+      nodeClasses.set(nodeId, new Set());
+    }
+
+    nodeClasses.get(nodeId).add(className);
+  }
+
+  function findIconColorForClasses(classes, iconColors) {
+    for (const className of classes || []) {
+      const color = iconColors.get(className);
+      if (color) return color;
+    }
+
+    return "";
+  }
+
+  function findColorForClasses(classes, classStyles) {
+    for (const className of classes || []) {
+      const color = classStyles.get(className);
+      if (color) return color;
+    }
+
+    return "";
+  }
+
+  function findRenderedNode(nodeId) {
+    const safeId = escapeCss(nodeId);
+    const selectors = [
+      `#${safeId}`,
+      `#flowchart-${safeId}-0`,
+      `[id^="flowchart-${nodeId}-"]`,
+      `[data-id="${nodeId}"]`,
+      `[data-node-id="${nodeId}"]`,
+    ];
+
+    for (const selector of selectors) {
+      const node = els.viewer.querySelector(selector);
+      if (node) return node;
+    }
+
+    return null;
+  }
+
+  function forceInlineIconColor(iconEl, color) {
+    iconEl.style.setProperty("color", color, "important");
+    iconEl.querySelectorAll("svg, svg *").forEach((element) => {
+      if (!(element instanceof SVGElement)) return;
+
+      element.style.setProperty("color", color, "important");
+
+      const fill = element.getAttribute("fill");
+      if (!fill || !/^(none|transparent)$/i.test(fill)) {
+        element.setAttribute("fill", color);
+        element.style.setProperty("fill", color, "important");
+      }
+
+      const stroke = element.getAttribute("stroke");
+      if (stroke && !/^(none|transparent)$/i.test(stroke)) {
+        element.setAttribute("stroke", color);
+        element.style.setProperty("stroke", color, "important");
+      }
+    });
+  }
+
+  function escapeCss(value) {
+    if (window.CSS?.escape) return window.CSS.escape(value);
+    return String(value).replace(/[^a-zA-Z0-9\-_]/g, "\\$&");
   }
 
   function getMermaidErrorLine(error) {
