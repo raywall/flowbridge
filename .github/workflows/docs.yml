@@ -17,13 +17,13 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
-defaults:
-  run:
-    working-directory: app/gitpage
+env:
+  # Opcoes: gitpage ou studio
+  PAGES_TARGET: studio
 
 jobs:
   build:
-    name: gerar docs
+    name: gerar pages
     runs-on: ubuntu-latest
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
 
@@ -33,7 +33,21 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
+      - name: validar alvo do pages
+        shell: bash
+        run: |
+          case "${PAGES_TARGET}" in
+            gitpage|studio)
+              echo "Publicando alvo: ${PAGES_TARGET}"
+              ;;
+            *)
+              echo "::error::PAGES_TARGET deve ser 'gitpage' ou 'studio'. Valor atual: ${PAGES_TARGET}"
+              exit 1
+              ;;
+          esac
+
       - name: configurar node
+        if: env.PAGES_TARGET == 'gitpage'
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -44,6 +58,7 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: definir url do docusaurus
+        if: env.PAGES_TARGET == 'gitpage'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -73,18 +88,29 @@ jobs:
           echo "FLOWBRIDGE_RELEASE_BASE_URL=https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${flowbridge_ref}/app/shared" >> "$GITHUB_ENV"
 
       - name: instalar dependencias
+        if: env.PAGES_TARGET == 'gitpage'
+        working-directory: app/gitpage
         run: npm ci
 
       - name: gerar build
+        if: env.PAGES_TARGET == 'gitpage'
+        working-directory: app/gitpage
         run: npm run build
 
-      - name: enviar artefato do pages
+      - name: enviar artefato do pages - gitpage
+        if: env.PAGES_TARGET == 'gitpage'
         uses: actions/upload-pages-artifact@v3
         with:
           path: app/gitpage/build
 
+      - name: enviar artefato do pages - studio
+        if: env.PAGES_TARGET == 'studio'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: studio
+
   deploy:
-    name: publicar docs
+    name: publicar pages
     runs-on: ubuntu-latest
     needs: build
 

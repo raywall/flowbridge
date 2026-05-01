@@ -80,6 +80,7 @@ Depois acesse:
 ```txt
 http://localhost:4210
 http://localhost:4220
+http://localhost:4230
 ```
 
 Para encerrar os servidores:
@@ -94,6 +95,29 @@ Também é possível subir cada parte separadamente:
 make shared
 make vendas
 make estoque
+make studio
+```
+
+## Flowbridge Studio
+
+O projeto inclui um MVP de editor online em `studio/`, pensado para GitHub Pages e inspirado no fluxo do Mermaid Live Editor. Ele funciona como uma aplicação estática: edita o script Mermaid/Flowbridge em uma sidebar fixa, renderiza o preview com zoom e arraste, permite resetar a posição e exporta o resultado como SVG ou PNG.
+
+Para rodar localmente:
+
+```bash
+make studio
+```
+
+Depois acesse:
+
+```txt
+http://localhost:4230
+```
+
+O Studio carrega `flowbridge.css`, `aws-icons.js` e `flowbridge.js` da última release do projeto via jsDelivr. Para testar uma versão específica, use:
+
+```txt
+http://localhost:4230/?flowbridgeRef=v2026.04.29-16
 ```
 
 ## Flowbridge para Obsidian

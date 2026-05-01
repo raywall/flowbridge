@@ -22,24 +22,30 @@ vendas:
 estoque:
 	@${DATADOG_ENV} DD_SERVICE=flowbridge-estoque python3 ${SOURCEDIR}/server.py 4220 ${BASEDIR}/estoque
 
+studio:
+	@${DATADOG_ENV} DD_SERVICE=flowbridge-studio python3 ${SOURCEDIR}/server.py 4230 ./studio
+
 # Inicia os dois sites em paralelo (dois processos em background)
 start:
 	@echo ""
 	@echo "  Iniciando Plugin.            em http://localhost:4200"
 	@echo "  Iniciando Vendas.            em http://localhost:4210"
 	@echo "  Iniciando Estoque.           em http://localhost:4220"
+	@echo "  Iniciando Studio.            em http://localhost:4230"
 	@echo ""
 	@${DATADOG_ENV} DD_SERVICE=flowbridge-shared python3 ${SOURCEDIR}/server.py 4200 ${BASEDIR}/shared & \
 	 ${DATADOG_ENV} DD_SERVICE=flowbridge-vendas python3 ${SOURCEDIR}/server.py 4210 ${BASEDIR}/vendas & \
 	 ${DATADOG_ENV} DD_SERVICE=flowbridge-estoque python3 ${SOURCEDIR}/server.py 4220 ${BASEDIR}/estoque & \
+	 ${DATADOG_ENV} DD_SERVICE=flowbridge-studio python3 ${SOURCEDIR}/server.py 4230 ./studio & \
 	 wait;
 
 # Encerra qualquer processo nas portas usadas
 stop:
-	@echo "  Encerrando processos nas portas 4200, 4210 e 4220..."
+	@echo "  Encerrando processos nas portas 4200, 4210, 4220 e 4230..."
 	@-lsof -ti tcp:4200 | xargs kill 2>/dev/null || true
 	@-lsof -ti tcp:4210 | xargs kill 2>/dev/null || true
 	@-lsof -ti tcp:4220 | xargs kill 2>/dev/null || true
+	@-lsof -ti tcp:4230 | xargs kill 2>/dev/null || true
 	@echo "  Pronto."
 
 # Gera o plugin flowbridge para obsidian
@@ -58,4 +64,4 @@ gitpage:
 	@cd app/gitpage; \
 	 npm start
 
-.PHONY: shared vendas estoque start stop build gitpage
+.PHONY: shared vendas estoque studio start stop build gitpage

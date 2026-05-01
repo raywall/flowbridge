@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Flowbridge Studio: editor online para diagramas Mermaid com metadados Flowbridge." />
+  <title>Flowbridge Studio</title>
+
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    window.mermaid = mermaid;
+  </script>
+  <script src="./studio.js" defer></script>
+</head>
+
+<body>
+  <aside class="studio-sidebar" id="studioSidebar" aria-label="Editor do diagrama">
+    <div class="sidebar-panel">
+      <label class="editor-label" for="diagramSource">Script Editor</label>
+      <div class="editor-frame" id="editorFrame">
+        <pre class="editor-lines" id="editorLineNumbers" aria-hidden="true">1</pre>
+        <div class="editor-code">
+          <pre class="editor-highlight" id="editorHighlight" aria-hidden="true"></pre>
+          <textarea id="diagramSource" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"></textarea>
+        </div>
+      </div>
+      <div class="editor-lint" id="editorLint" role="status">Validando Mermaid...</div>
+
+      <footer class="sidebar-footer">
+        <span id="editorStats">0 linhas</span>
+        <button class="text-button" id="formatExample" type="button">Restaurar exemplo</button>
+      </footer>
+
+      <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Redimensionar editor"></div>
+    </div>
+
+    <div class="sidebar-rail" aria-hidden="false">
+      <button class="rail-toggle" id="collapseSidebar" type="button" title="Fechar editor" aria-label="Fechar editor" aria-controls="diagramSource" aria-expanded="true">
+        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+      </button>
+      <span class="rail-title">
+        <p class="eyebrow">Flowbridge Studio</p>
+        <h1>Editor</h1>
+      </span>
+    </div>
+  </aside>
+
+  <main class="studio-preview" id="studioPreview">
+    <header class="preview-toolbar">
+      <div>
+        <p class="eyebrow">Preview</p>
+        <h2 id="diagramTitle">Diagrama</h2>
+      </div>
+      <div class="preview-actions">
+        <button class="tool-button" id="resetView" type="button" title="Resetar zoom e posição" aria-label="Resetar zoom e posição">
+          <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+          <span>Reset</span>
+        </button>
+        <button class="tool-button" id="exportSvg" type="button" title="Exportar SVG" aria-label="Exportar SVG">
+          <i class="fa-regular fa-file-code" aria-hidden="true"></i>
+          <span>SVG</span>
+        </button>
+        <button class="tool-button tool-button--primary" id="exportPng" type="button" title="Exportar PNG" aria-label="Exportar PNG">
+          <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i>
+          <span>PNG</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="viewer-shell" aria-label="Visualização do Flowbridge">
+      <div id="viewer"></div>
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="loader"></div>
+        <span>Carregando Flowbridge...</span>
+      </div>
+    </section>
+  </main>
+</body>
+
+</html>
