@@ -81,6 +81,9 @@ flowchart LR
     els.lint = document.getElementById("editorLint");
     els.editorStats = document.getElementById("editorStats");
     els.restoreExample = document.getElementById("formatExample");
+    els.importScript = document.getElementById("importScript");
+    els.exportScript = document.getElementById("exportScript");
+    els.scriptFileInput = document.getElementById("scriptFileInput");
     els.viewer = document.getElementById("viewer");
     els.title = document.getElementById("diagramTitle");
     els.resetView = document.getElementById("resetView");
@@ -127,15 +130,15 @@ flowchart LR
     });
 
     els.restoreExample.addEventListener("click", () => {
-      setEditorValue(DEFAULT_SOURCE);
-      localStorage.setItem(STORAGE_KEYS.source, DEFAULT_SOURCE);
-      updateStats();
-      updateTitle();
-      updateLineNumbers();
-      updateSyntaxHighlight();
-      scheduleMermaidLint(0);
-      renderNow();
+      setEditorSource(DEFAULT_SOURCE);
     });
+
+    els.importScript.addEventListener("click", () => {
+      els.scriptFileInput.click();
+    });
+
+    els.scriptFileInput.addEventListener("change", () => importScriptFile());
+    els.exportScript.addEventListener("click", () => exportScriptFile());
 
     els.collapseSidebar.addEventListener("click", () => setSidebarCollapsed(!isSidebarCollapsed()));
     els.resetView.addEventListener("click", () => viewer?.resetView?.());
@@ -358,6 +361,45 @@ flowchart LR
     const lines = els.editor.value.split(/\r?\n/).length;
     const chars = els.editor.value.length;
     els.editorStats.textContent = `${lines} linhas · ${chars} caracteres`;
+  }
+
+  function setEditorSource(value, { persist = true, render = true } = {}) {
+    setEditorValue(value);
+    lintErrorLine = 0;
+
+    if (persist) {
+      localStorage.setItem(STORAGE_KEYS.source, value);
+    }
+
+    updateStats();
+    updateTitle();
+    updateLineNumbers();
+    updateSyntaxHighlight();
+    scheduleMermaidLint(0);
+
+    if (render) {
+      renderNow();
+    }
+  }
+
+  async function importScriptFile() {
+    const file = els.scriptFileInput.files?.[0];
+    if (!file) return;
+
+    try {
+      const content = await file.text();
+      setEditorSource(content);
+      setLintStatus("idle", `Arquivo carregado: ${file.name}`);
+    } catch (error) {
+      setLintStatus("error", `Falha ao carregar arquivo: ${error.message || "erro desconhecido"}`);
+    } finally {
+      els.scriptFileInput.value = "";
+    }
+  }
+
+  function exportScriptFile() {
+    const source = els.editor.value;
+    downloadBlob(source, `${getExportName()}.mmd`, "text/plain;charset=utf-8");
   }
 
   function updateLineNumbers() {

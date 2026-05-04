@@ -310,6 +310,14 @@ h2 {
   font-size: 0.82rem;
 }
 
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .sidebar-resizer {
   position: absolute;
   top: 0;

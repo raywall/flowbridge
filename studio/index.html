@@ -48,7 +48,21 @@
 
       <footer class="sidebar-footer">
         <span id="editorStats">0 linhas</span>
-        <button class="text-button" id="formatExample" type="button">Restaurar exemplo</button>
+        <div class="sidebar-actions">
+          <input id="scriptFileInput" type="file" accept=".mmd,.mermaid,text/plain" hidden />
+          <button class="text-button" id="importScript" type="button" title="Carregar script .mmd" aria-label="Carregar script .mmd">
+            <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+            <span>Carregar</span>
+          </button>
+          <button class="text-button" id="exportScript" type="button" title="Exportar script .mmd" aria-label="Exportar script .mmd">
+            <i class="fa-regular fa-file-lines" aria-hidden="true"></i>
+            <span>.mmd</span>
+          </button>
+          <button class="text-button" id="formatExample" type="button" title="Restaurar exemplo" aria-label="Restaurar exemplo">
+            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+            <span>Exemplo</span>
+          </button>
+        </div>
       </footer>
 
       <div class="sidebar-resizer" id="sidebarResizer" role="separator" aria-orientation="vertical" aria-label="Redimensionar editor"></div>
