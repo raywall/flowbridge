@@ -178,7 +178,7 @@ h2 {
 #diagramSource {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 20px;
   tab-size: 2;
 }
 
@@ -191,14 +191,13 @@ h2 {
   border-right: 1px solid var(--panel-strong);
   background: #f8fafc;
   color: #7c8a9a;
-  line-height: 1.6;
   text-align: right;
   user-select: none;
 }
 
 .editor-lines span {
   display: block;
-  min-height: 20.8px;
+  height: 20px;
 }
 
 .editor-lines .is-error {

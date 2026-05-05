@@ -327,6 +327,9 @@ flowchart LR
         showToolbar: false,
         showDownloadButton: false,
         enableZoom: true,
+        minZoom: 0.1,
+        maxZoom: 8,
+        zoomStep: 0.25,
         showViewControls: false,
       });
 

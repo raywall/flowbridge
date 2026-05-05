@@ -468,9 +468,7 @@ export class FlowbridgeViewer {
   private attachPanZoomHandlers() {
     this.svgWrap.addEventListener('wheel', (event) => {
       event.preventDefault();
-      const delta = event.deltaY < 0 ? 0.1 : -0.1;
-      this.zoom.scale = Math.min(3, Math.max(0.35, this.zoom.scale + delta));
-      this.applyZoom();
+      this.zoomAt(event.deltaY < 0 ? 1 : -1, event.clientX, event.clientY);
     }, { passive: false });
 
     this.svgWrap.addEventListener('mousedown', (event) => {
@@ -499,9 +497,7 @@ export class FlowbridgeViewer {
   private attachModalPanZoomHandlers() {
     this.modalDialogEl.addEventListener('wheel', (event) => {
       event.preventDefault();
-      const delta = event.deltaY < 0 ? 0.1 : -0.1;
-      this.modalZoom.scale = Math.min(4, Math.max(0.35, this.modalZoom.scale + delta));
-      this.applyModalZoom();
+      this.modalZoomAt(event.deltaY < 0 ? 1 : -1, event.clientX, event.clientY);
     }, { passive: false });
 
     this.modalDialogEl.addEventListener('mousedown', (event) => {
@@ -527,6 +523,44 @@ export class FlowbridgeViewer {
       this.modalZoom.dragging = false;
       this.modalDialogEl.removeClass('fb-modal-dialog--dragging');
     });
+  }
+
+  private zoomAt(direction: number, clientX: number, clientY: number) {
+    const rect = this.svgWrap.getBoundingClientRect();
+    const previousScale = this.zoom.scale;
+    const nextScale = this.clampZoom(previousScale + direction * 0.25);
+    if (nextScale === previousScale) return;
+
+    const pointX = clientX - rect.left;
+    const pointY = clientY - rect.top;
+    const contentX = (pointX - this.zoom.x) / previousScale;
+    const contentY = (pointY - this.zoom.y) / previousScale;
+
+    this.zoom.scale = nextScale;
+    this.zoom.x = pointX - contentX * nextScale;
+    this.zoom.y = pointY - contentY * nextScale;
+    this.applyZoom();
+  }
+
+  private modalZoomAt(direction: number, clientX: number, clientY: number) {
+    const rect = this.modalDialogEl.getBoundingClientRect();
+    const previousScale = this.modalZoom.scale;
+    const nextScale = this.clampZoom(previousScale + direction * 0.25);
+    if (nextScale === previousScale) return;
+
+    const pointX = clientX - rect.left;
+    const pointY = clientY - rect.top;
+    const contentX = (pointX - this.modalZoom.x) / previousScale;
+    const contentY = (pointY - this.modalZoom.y) / previousScale;
+
+    this.modalZoom.scale = nextScale;
+    this.modalZoom.x = pointX - contentX * nextScale;
+    this.modalZoom.y = pointY - contentY * nextScale;
+    this.applyModalZoom();
+  }
+
+  private clampZoom(value: number) {
+    return Math.min(8, Math.max(0.1, Number(value.toFixed(2))));
   }
 
   private resetZoom() {
